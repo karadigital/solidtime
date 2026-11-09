@@ -18,6 +18,11 @@ class Kernel extends ConsoleKernel
             ->when(fn (): bool => config('scheduling.tasks.time_entry_send_still_running_mails'))
             ->everyTenMinutes();
 
+        $schedule->command('time-entry:auto-stop')
+            ->when(fn (): bool => config('scheduling.tasks.time_entry_auto_stop'))
+            ->everyMinute()
+            ->withoutOverlapping();
+
         $schedule->command('auth:send-mails-expiring-api-tokens')
             ->when(fn (): bool => config('scheduling.tasks.auth_send_mails_expiring_api_tokens'))
             ->everyTenMinutes();
