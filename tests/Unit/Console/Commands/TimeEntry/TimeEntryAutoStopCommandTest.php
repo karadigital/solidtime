@@ -137,6 +137,35 @@ class TimeEntryAutoStopCommandTest extends TestCaseWithDatabase
         Mail::assertQueued(TimeEntryAutoStoppedMail::class, 1);
     }
 
+    public function test_uses_the_local_start_date_when_it_differs_from_the_utc_date(): void
+    {
+        // Arrange: Monday 06:00 in Jakarta is still Sunday 23:00 in UTC
+        $data = $this->createAutoStopUser();
+        $timeEntry = $this->createRunningEntry($data->member, '2026-11-16 06:00:00');
+
+        // Act
+        $this->runCommand('2026-11-16 17:31:00');
+
+        // Assert
+        $timeEntry->refresh();
+        $this->assertNotNull($timeEntry->end);
+        $this->assertTrue($timeEntry->end->equalTo(Carbon::parse('2026-11-16 10:30:00', 'UTC')));
+    }
+
+    public function test_does_not_stop_entry_started_on_local_weekend_that_is_a_weekday_in_utc(): void
+    {
+        // Arrange: Saturday 08:00 in Tokyo is still Friday 23:00 in UTC
+        $data = $this->createAutoStopUser(timezone: 'Asia/Tokyo');
+        $timeEntry = $this->createRunningEntry($data->member, '2026-11-14 08:00:00', 'Asia/Tokyo');
+
+        // Act
+        $this->runCommand('2026-11-14 18:00:00', 'Asia/Tokyo');
+
+        // Assert
+        $this->assertNull($timeEntry->refresh()->end);
+        Mail::assertNothingOutgoing();
+    }
+
     public function test_does_not_stop_entry_started_on_weekend(): void
     {
         // Arrange
