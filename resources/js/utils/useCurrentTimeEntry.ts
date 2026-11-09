@@ -31,7 +31,7 @@ const emptyTimeEntry = {
 
 export const useCurrentTimeEntryStore = defineStore('currentTimeEntry', () => {
     const currentTimeEntry = ref<TimeEntry>({ ...emptyTimeEntry });
-    const { handleApiRequestNotifications } = useNotificationsStore();
+    const { handleApiRequestNotifications, addNotification } = useNotificationsStore();
     const queryClient = useQueryClient();
 
     useLocalStorage('solidtime/current-time-entry', currentTimeEntry, {
@@ -133,10 +133,42 @@ export const useCurrentTimeEntryStore = defineStore('currentTimeEntry', () => {
         }
     }
 
+    /**
+     * The timer may have been stopped on the server in the meantime (e.g. by the auto stop at the end of the
+     * workday, or on another device). Writing to it then would overwrite its end, so check first.
+     * Returns false (and resets the local timer) if the current time entry is no longer running on the server.
+     */
+    async function ensureCurrentTimeEntryIsStillRunning(): Promise<boolean> {
+        const timeEntryId = currentTimeEntry.value.id;
+        let stillRunning: boolean;
+        try {
+            const response = await api.getMyActiveTimeEntry({});
+            stillRunning = response?.data?.id === timeEntryId;
+        } catch (error) {
+            const status = (error as { response?: { status?: number } })?.response?.status;
+            // Only a 404 means "no running time entry"; for other errors keep the previous behaviour
+            stillRunning = status !== 404;
+        }
+        if (!stillRunning) {
+            $reset();
+            stopLiveTimer();
+            addNotification(
+                'error',
+                'Your timer was already stopped',
+                'It was stopped automatically or on another device. Your change was not saved.'
+            );
+            queryClient.invalidateQueries({ queryKey: ['timeEntries'] });
+        }
+        return stillRunning;
+    }
+
     async function stopTimer() {
         const user = getCurrentUserId();
         const organization = getCurrentOrganizationId();
         if (organization) {
+            if (!(await ensureCurrentTimeEntryIsStillRunning())) {
+                return;
+            }
             const currentDateTime = dayjs().utc().format();
             await handleApiRequestNotifications(
                 () =>
@@ -165,6 +197,12 @@ export const useCurrentTimeEntryStore = defineStore('currentTimeEntry', () => {
         const user = getCurrentUserId();
         const organization = getCurrentOrganizationId();
         if (organization) {
+            if (
+                currentTimeEntry.value.end === null &&
+                !(await ensureCurrentTimeEntryIsStillRunning())
+            ) {
+                return;
+            }
             const response = await handleApiRequestNotifications(
                 () =>
                     api.updateTimeEntry(
