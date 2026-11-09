@@ -35,7 +35,7 @@ const { data: latestTeamActivity, isLoading } = useQuery({
         <div
             v-else-if="latestTeamActivity"
             data-testid="team_activity_list"
-            class="max-h-64 overflow-y-auto">
+            class="max-h-72 overflow-y-auto">
             <TeamActivityCardEntry
                 v-for="activity in latestTeamActivity"
                 :key="activity.time_entry_id"

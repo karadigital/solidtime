@@ -37,6 +37,16 @@ describe('TeamActivityCard', () => {
         const wrapper = mount(TeamActivityCard);
 
         const list = wrapper.get('[data-testid="team_activity_list"]');
-        expect(list.classes()).toEqual(expect.arrayContaining(['max-h-64', 'overflow-y-auto']));
+        expect(list.classes()).toContain('overflow-y-auto');
+    });
+
+    it('caps the list at a height that leaves part of a fifth entry visible, hinting that it scrolls', () => {
+        // Entry height (text-sm line-height 18px): 52-54px below 2xl, 60-62px at 2xl (py-3).
+        // max-h-64 (256px) fits exactly 4 working entries at 2xl, hiding the 5th entirely
+        // on overlay-scrollbar systems; max-h-72 (288px) always shows ~26px+ of the 5th entry.
+        const wrapper = mount(TeamActivityCard);
+
+        const list = wrapper.get('[data-testid="team_activity_list"]');
+        expect(list.classes()).toContain('max-h-72');
     });
 });
