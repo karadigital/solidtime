@@ -487,6 +487,77 @@ class UserEndpointTest extends ApiEndpointTestAbstract
         $response->assertJsonValidationErrors(['timezone']);
     }
 
+    public function test_me_returns_auto_stop_defaults(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->getJson(route('api.v1.users.me'));
+
+        // Assert
+        $response->assertSuccessful();
+        $this->assertFalse($response->json('data.auto_stop_time_entries'));
+        $this->assertSame('17:30', $response->json('data.auto_stop_time'));
+    }
+
+    public function test_update_changes_auto_stop_settings(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->putJson(route('api.v1.users.update', $data->user->getKey()), [
+            'auto_stop_time_entries' => true,
+            'auto_stop_time' => '16:45',
+        ]);
+
+        // Assert
+        $response->assertSuccessful();
+        $this->assertTrue($response->json('data.auto_stop_time_entries'));
+        $this->assertSame('16:45', $response->json('data.auto_stop_time'));
+        $user = $data->user->fresh();
+        $this->assertTrue($user->auto_stop_time_entries);
+        $this->assertSame('16:45', $user->auto_stop_time);
+    }
+
+    public function test_update_fails_if_auto_stop_time_is_invalid(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission();
+        Passport::actingAs($data->user);
+
+        foreach (['', '25:00', '5pm', '17:30:00'] as $invalidTime) {
+            // Act
+            $response = $this->putJson(route('api.v1.users.update', $data->user->getKey()), [
+                'auto_stop_time' => $invalidTime,
+            ]);
+
+            // Assert
+            $response->assertUnprocessable();
+            $response->assertJsonValidationErrors(['auto_stop_time']);
+        }
+        $this->assertSame('17:30', $data->user->fresh()->auto_stop_time);
+    }
+
+    public function test_update_fails_if_auto_stop_time_entries_is_not_boolean(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->putJson(route('api.v1.users.update', $data->user->getKey()), [
+            'auto_stop_time_entries' => 'yes',
+        ]);
+
+        // Assert
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['auto_stop_time_entries']);
+    }
+
     public function test_update_fails_if_week_start_is_invalid(): void
     {
         // Arrange
