@@ -475,6 +475,90 @@ class DashboardServiceTest extends TestCase
         ], $result);
     }
 
+    public function test_latest_team_activity_returns_all_working_members_even_if_more_than_four(): void
+    {
+        // Arrange
+        $organization = Organization::factory()->create();
+        $runningEntries = [];
+        foreach ([10, 20, 30, 40, 50, 60] as $minutesAgo) {
+            $member = Member::factory()->forOrganization($organization)->create();
+            $runningEntries[] = TimeEntry::factory()->forMember($member)->forOrganization($organization)->active()->create([
+                'start' => now()->subMinutes($minutesAgo),
+            ]);
+        }
+        $idleMember = Member::factory()->forOrganization($organization)->create();
+        TimeEntry::factory()->forMember($idleMember)->forOrganization($organization)->create([
+            'start' => now()->subMinutes(5),
+            'end' => now()->subMinutes(2),
+        ]);
+        $otherOrganization = Organization::factory()->create();
+        $otherMember = Member::factory()->forOrganization($otherOrganization)->create();
+        TimeEntry::factory()->forMember($otherMember)->forOrganization($otherOrganization)->active()->create([
+            'start' => now()->subMinutes(1),
+        ]);
+
+        // Act
+        $result = $this->dashboardService->latestTeamActivity($organization);
+
+        // Assert
+        $this->assertSame(
+            array_map(fn (TimeEntry $timeEntry): string => $timeEntry->getKey(), $runningEntries),
+            array_column($result, 'time_entry_id')
+        );
+        $this->assertSame([true, true, true, true, true, true], array_column($result, 'status'));
+    }
+
+    public function test_latest_team_activity_lists_working_members_first_and_fills_up_to_four_with_idle_members(): void
+    {
+        // Arrange
+        $organization = Organization::factory()->create();
+        $running30 = TimeEntry::factory()->forMember(Member::factory()->forOrganization($organization)->create())
+            ->forOrganization($organization)->active()->create(['start' => now()->subMinutes(30)]);
+        $running40 = TimeEntry::factory()->forMember(Member::factory()->forOrganization($organization)->create())
+            ->forOrganization($organization)->active()->create(['start' => now()->subMinutes(40)]);
+        $stopped5 = TimeEntry::factory()->forMember(Member::factory()->forOrganization($organization)->create())
+            ->forOrganization($organization)->create(['start' => now()->subMinutes(5), 'end' => now()->subMinutes(1)]);
+        $stopped10 = TimeEntry::factory()->forMember(Member::factory()->forOrganization($organization)->create())
+            ->forOrganization($organization)->create(['start' => now()->subMinutes(10), 'end' => now()->subMinutes(6)]);
+        TimeEntry::factory()->forMember(Member::factory()->forOrganization($organization)->create())
+            ->forOrganization($organization)->create(['start' => now()->subMinutes(20), 'end' => now()->subMinutes(11)]);
+
+        // Act
+        $result = $this->dashboardService->latestTeamActivity($organization);
+
+        // Assert
+        $this->assertSame(
+            [$running30->getKey(), $running40->getKey(), $stopped5->getKey(), $stopped10->getKey()],
+            array_column($result, 'time_entry_id')
+        );
+        $this->assertSame([true, true, false, false], array_column($result, 'status'));
+    }
+
+    public function test_latest_team_activity_reports_member_as_working_when_running_entry_is_not_their_latest_start(): void
+    {
+        // Arrange
+        $organization = Organization::factory()->create();
+        $member = Member::factory()->forOrganization($organization)->create();
+        $runningEntry = TimeEntry::factory()->forMember($member)->forOrganization($organization)->active()->create([
+            'description' => 'Running',
+            'start' => now()->subMinutes(60),
+        ]);
+        TimeEntry::factory()->forMember($member)->forOrganization($organization)->create([
+            'description' => 'Manual',
+            'start' => now()->subMinutes(5),
+            'end' => now()->subMinutes(1),
+        ]);
+
+        // Act
+        $result = $this->dashboardService->latestTeamActivity($organization);
+
+        // Assert
+        $this->assertCount(1, $result);
+        $this->assertSame($runningEntry->getKey(), $result[0]['time_entry_id']);
+        $this->assertSame('Running', $result[0]['description']);
+        $this->assertTrue($result[0]['status']);
+    }
+
     public function test_latest_tasks_returns_the_4_tasks_with_the_latest_time_entries(): void
     {
         // Arrange
