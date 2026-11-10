@@ -25,6 +25,7 @@ import UserSettingsIcon from '@/Components/UserSettingsIcon.vue';
 import MainContainer from '@/packages/ui/src/MainContainer.vue';
 import { nextTick, onMounted, provide, ref } from 'vue';
 import NotificationContainer from '@/Components/NotificationContainer.vue';
+import PlaneReviewPrompt from '@/Components/Common/Plane/PlaneReviewPrompt.vue';
 import { initializeStores } from '@/utils/init';
 import { useCurrentTimeEntryStore } from '@/utils/useCurrentTimeEntry';
 import {
@@ -373,6 +374,7 @@ const page = usePage<{
         </div>
     </div>
     <NotificationContainer></NotificationContainer>
+    <PlaneReviewPrompt></PlaneReviewPrompt>
     <UserTimezoneMismatchModal></UserTimezoneMismatchModal>
     <CommandPaletteProvider></CommandPaletteProvider>
 </template>

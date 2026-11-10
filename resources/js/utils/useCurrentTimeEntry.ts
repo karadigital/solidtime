@@ -12,6 +12,7 @@ import {
 import { useLocalStorage } from '@vueuse/core';
 import { useNotificationsStore } from '@/utils/notification';
 import { useQueryClient } from '@tanstack/vue-query';
+import { isPlaneIntegrationEnabled } from '@/utils/plane';
 
 dayjs.extend(utc);
 
@@ -37,6 +38,12 @@ export const useCurrentTimeEntryStore = defineStore('currentTimeEntry', () => {
     useLocalStorage('solidtime/current-time-entry', currentTimeEntry, {
         deep: true,
     });
+
+    /**
+     * Set after the user stopped a timer on a task, so the user can be asked whether to move
+     * the task's Plane work item to review (see PlaneReviewPrompt).
+     */
+    const planeReviewCandidate = ref<{ timeEntryId: string; taskId: string } | null>(null);
 
     function $reset() {
         currentTimeEntry.value = { ...emptyTimeEntry };
@@ -133,12 +140,15 @@ export const useCurrentTimeEntryStore = defineStore('currentTimeEntry', () => {
         }
     }
 
-    async function stopTimer() {
+    /**
+     * @returns true if the timer was stopped on the server
+     */
+    async function stopTimer(): Promise<boolean> {
         const user = getCurrentUserId();
         const organization = getCurrentOrganizationId();
         if (organization) {
             const currentDateTime = dayjs().utc().format();
-            await handleApiRequestNotifications(
+            const response = await handleApiRequestNotifications(
                 () =>
                     api.updateTimeEntry(
                         {
@@ -156,6 +166,7 @@ export const useCurrentTimeEntryStore = defineStore('currentTimeEntry', () => {
                 'Timer stopped!'
             );
             $reset();
+            return response?.data !== undefined;
         } else {
             throw new Error('Failed to stop current timer because organization ID is missing.');
         }
@@ -219,7 +230,15 @@ export const useCurrentTimeEntryStore = defineStore('currentTimeEntry', () => {
             await startTimer();
         } else {
             stopLiveTimer();
-            await stopTimer();
+            const stoppedTimeEntryId = currentTimeEntry.value.id;
+            const stoppedTaskId = currentTimeEntry.value.task_id;
+            const stopped = await stopTimer();
+            if (stopped && stoppedTaskId !== null && isPlaneIntegrationEnabled()) {
+                planeReviewCandidate.value = {
+                    timeEntryId: stoppedTimeEntryId,
+                    taskId: stoppedTaskId,
+                };
+            }
         }
         queryClient.invalidateQueries({ queryKey: ['timeEntries'] });
     }
@@ -233,6 +252,7 @@ export const useCurrentTimeEntryStore = defineStore('currentTimeEntry', () => {
         stopLiveTimer,
         now,
         setActiveState,
+        planeReviewCandidate,
         $reset,
     };
 });

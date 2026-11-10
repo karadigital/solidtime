@@ -4709,6 +4709,60 @@ the organization.`,
     },
     {
         method: 'post',
+        path: '/v1/organizations/:organization/time-entries/:timeEntry/plane-review',
+        alias: 'moveTimeEntryTaskToPlaneReview',
+        description: `Moves the work item to "In Review", or "Ready for Test" if the Plane project has no "In Review" state.
+The task has to be named after the work item, f.e. "[KARA-47] Title".`,
+        requestFormat: 'json',
+        parameters: [
+            {
+                name: 'organization',
+                type: 'Path',
+                schema: z.string(),
+            },
+            {
+                name: 'timeEntry',
+                type: 'Path',
+                schema: z.string(),
+            },
+        ],
+        response: z
+            .object({
+                data: z
+                    .object({
+                        identifier: z.string(),
+                        outcome: z.enum([
+                            'moved',
+                            'already_in_state',
+                            'work_item_closed',
+                            'state_not_found',
+                            'work_item_not_found',
+                        ]),
+                        state: z.union([z.string(), z.null()]),
+                    })
+                    .passthrough(),
+            })
+            .passthrough(),
+        errors: [
+            {
+                status: 401,
+                description: `Unauthenticated`,
+                schema: z.object({ message: z.string() }).passthrough(),
+            },
+            {
+                status: 403,
+                description: `Authorization error`,
+                schema: z.object({ message: z.string() }).passthrough(),
+            },
+            {
+                status: 422,
+                description: `No task linked to a Plane work item`,
+                schema: z.object({ message: z.string() }).passthrough(),
+            },
+        ],
+    },
+    {
+        method: 'post',
         path: '/v1/users/:user/reset-pending-email',
         alias: 'resetUserPendingEmail',
         description: `This endpoint is independent of the organization.`,
