@@ -89,6 +89,20 @@ class PlaneStatusServiceTest extends TestCase
         $this->assertFalse(app(PlaneClient::class)->isConfigured());
     }
 
+    public function test_is_enabled_only_for_the_configured_organization(): void
+    {
+        $client = app(PlaneClient::class);
+        config(['services.plane.organization_id' => 'org-kara']);
+        $this->assertTrue($client->isEnabledForOrganization('org-kara'));
+        $this->assertFalse($client->isEnabledForOrganization('org-other'));
+
+        config(['services.plane.organization_id' => '']);
+        $this->assertFalse($client->isEnabledForOrganization('org-kara'));
+
+        config(['services.plane.organization_id' => 'org-kara', 'services.plane.api_key' => '']);
+        $this->assertFalse($client->isEnabledForOrganization('org-kara'));
+    }
+
     public function test_moves_to_in_progress(): void
     {
         $this->fakePlane('s-todo', $this->states());

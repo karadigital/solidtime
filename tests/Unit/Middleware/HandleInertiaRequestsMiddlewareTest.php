@@ -62,10 +62,14 @@ class HandleInertiaRequestsMiddlewareTest extends MiddlewareTestAbstract
             'services.plane.api_key' => 'key',
             'services.plane.base_url' => 'https://plane.test',
             'services.plane.workspace_slug' => 'kara',
+            'services.plane.organization_id' => $user->organization->getKey(),
         ]);
         $this->get($route)->assertInertia(fn (Assert $page) => $page->where('plane_integration_enabled', true));
 
-        config(['services.plane.api_key' => null]);
+        config(['services.plane.organization_id' => 'another-organization']);
+        $this->get($route)->assertInertia(fn (Assert $page) => $page->where('plane_integration_enabled', false));
+
+        config(['services.plane.organization_id' => $user->organization->getKey(), 'services.plane.api_key' => null]);
         $this->get($route)->assertInertia(fn (Assert $page) => $page->where('plane_integration_enabled', false));
     }
 

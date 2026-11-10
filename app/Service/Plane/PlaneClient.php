@@ -22,6 +22,16 @@ class PlaneClient
     }
 
     /**
+     * The API key acts on the whole Plane workspace, so only the configured solidtime organization may use it.
+     */
+    public function isEnabledForOrganization(string $organizationId): bool
+    {
+        $configuredOrganizationId = trim((string) config('services.plane.organization_id'));
+
+        return $this->isConfigured() && $configuredOrganizationId !== '' && $configuredOrganizationId === $organizationId;
+    }
+
+    /**
      * @return array{id: string, project: string, state: string}|null null if the work item does not exist or is not
      *                                                                accessible (Plane answers 403 for an unknown project
      *                                                                identifier or a project the API user is no member of)

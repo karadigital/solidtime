@@ -39,8 +39,8 @@ class TimeEntryPlaneController extends Controller
             throw new AuthorizationException('Time entry does not belong to organization');
         }
 
-        if (! $planeClient->isConfigured()) {
-            return response()->json(['message' => 'The Plane integration is not configured.'], 503);
+        if (! $planeClient->isEnabledForOrganization($organization->getKey())) {
+            return response()->json(['message' => 'The Plane integration is not enabled for this organization.'], 503);
         }
 
         /** @var Task|null $task */

@@ -13,5 +13,7 @@ return [
         'api_key' => env('PLANE_API_KEY'),
         'base_url' => env('PLANE_BASE_URL'),
         'workspace_slug' => env('PLANE_WORKSPACE_SLUG'),
+        // Only this solidtime organization moves Plane work items (the API key acts on the whole Plane workspace)
+        'organization_id' => env('PLANE_ORGANIZATION_ID'),
     ],
 ];

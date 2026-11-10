@@ -31,6 +31,11 @@ class TimeEntryPlaneObserverTest extends TestCaseWithDatabase
         Bus::fake([MovePlaneWorkItemToInProgress::class]);
     }
 
+    private function enablePlaneFor(Organization $organization): void
+    {
+        config(['services.plane.organization_id' => $organization->getKey()]);
+    }
+
     private function createTask(Organization $organization, string $name = '[KARA-47] Auto change'): Task
     {
         $project = Project::factory()->forOrganization($organization)->create();
@@ -51,6 +56,7 @@ class TimeEntryPlaneObserverTest extends TestCaseWithDatabase
     {
         // Arrange
         $data = $this->createUserWithPermission();
+        $this->enablePlaneFor($data->organization);
         $task = $this->createTask($data->organization);
 
         // Act
@@ -64,6 +70,7 @@ class TimeEntryPlaneObserverTest extends TestCaseWithDatabase
     {
         // Arrange
         $data = $this->createUserWithPermission();
+        $this->enablePlaneFor($data->organization);
         $task = $this->createTask($data->organization, '[SUBE-12] Something');
 
         // Act
@@ -77,6 +84,7 @@ class TimeEntryPlaneObserverTest extends TestCaseWithDatabase
     {
         // Arrange
         $data = $this->createUserWithPermission();
+        $this->enablePlaneFor($data->organization);
         $task = $this->createTask($data->organization);
         $timeEntry = TimeEntry::factory()->forMember($data->member)->active()->create();
         Bus::assertNotDispatchedAfterResponse(MovePlaneWorkItemToInProgress::class);
@@ -94,6 +102,7 @@ class TimeEntryPlaneObserverTest extends TestCaseWithDatabase
     {
         // Arrange
         $data = $this->createUserWithPermission();
+        $this->enablePlaneFor($data->organization);
         $task = $this->createTask($data->organization);
         $timeEntry = TimeEntry::factory()->forMember($data->member)->forTask($task)->active()->create();
 
@@ -109,6 +118,7 @@ class TimeEntryPlaneObserverTest extends TestCaseWithDatabase
     {
         // Arrange
         $data = $this->createUserWithPermission();
+        $this->enablePlaneFor($data->organization);
         $task = $this->createTask($data->organization);
 
         // Act
@@ -125,7 +135,22 @@ class TimeEntryPlaneObserverTest extends TestCaseWithDatabase
     {
         // Arrange
         $data = $this->createUserWithPermission();
+        $this->enablePlaneFor($data->organization);
         $task = $this->createTask($data->organization, 'Finish migration');
+
+        // Act
+        TimeEntry::factory()->forMember($data->member)->forTask($task)->active()->create();
+
+        // Assert
+        Bus::assertNotDispatchedAfterResponse(MovePlaneWorkItemToInProgress::class);
+    }
+
+    public function test_does_not_dispatch_for_other_organizations(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission();
+        $this->enablePlaneFor(Organization::factory()->create());
+        $task = $this->createTask($data->organization);
 
         // Act
         TimeEntry::factory()->forMember($data->member)->forTask($task)->active()->create();
@@ -139,6 +164,7 @@ class TimeEntryPlaneObserverTest extends TestCaseWithDatabase
         // Arrange
         config(['services.plane.api_key' => '']);
         $data = $this->createUserWithPermission();
+        $this->enablePlaneFor($data->organization);
         $task = $this->createTask($data->organization);
 
         // Act
@@ -156,6 +182,7 @@ class TimeEntryPlaneObserverTest extends TestCaseWithDatabase
             'time-entries:create:own',
             'projects:view:all',
         ]);
+        $this->enablePlaneFor($data->organization);
         $task = $this->createTask($data->organization);
         Passport::actingAs($data->user);
 

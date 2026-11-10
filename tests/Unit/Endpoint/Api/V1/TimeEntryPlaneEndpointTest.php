@@ -31,6 +31,11 @@ class TimeEntryPlaneEndpointTest extends ApiEndpointTestAbstract
         ]);
     }
 
+    private function enablePlaneFor(Organization $organization): void
+    {
+        config(['services.plane.organization_id' => $organization->getKey()]);
+    }
+
     private function createStoppedEntry(Organization $organization, Member $member, ?string $taskName = '[KARA-47] Auto change'): TimeEntry
     {
         $factory = TimeEntry::factory()->forMember($member)->forOrganization($organization);
@@ -67,6 +72,7 @@ class TimeEntryPlaneEndpointTest extends ApiEndpointTestAbstract
     {
         // Arrange
         $data = $this->createUserWithPermission(['time-entries:update:own']);
+        $this->enablePlaneFor($data->organization);
         $timeEntry = $this->createStoppedEntry($data->organization, $data->member);
         $this->fakePlaneWorkItem();
         Passport::actingAs($data->user);
@@ -87,6 +93,7 @@ class TimeEntryPlaneEndpointTest extends ApiEndpointTestAbstract
     {
         // Arrange
         $data = $this->createUserWithPermission(['time-entries:update:own']);
+        $this->enablePlaneFor($data->organization);
         $timeEntry = $this->createStoppedEntry($data->organization, $data->member, '[SOPI-293] Old identifier');
         Http::fake([self::BASE.'/work-items/SOPI-293/' => Http::response(['detail' => 'You do not have permission to perform this action.'], 403)]);
         Passport::actingAs($data->user);
@@ -105,6 +112,7 @@ class TimeEntryPlaneEndpointTest extends ApiEndpointTestAbstract
     {
         // Arrange
         $data = $this->createUserWithPermission(['time-entries:update:own']);
+        $this->enablePlaneFor($data->organization);
         $withoutTask = $this->createStoppedEntry($data->organization, $data->member, null);
         $withoutIdentifier = $this->createStoppedEntry($data->organization, $data->member, 'Finish migration');
         Http::fake();
@@ -124,6 +132,7 @@ class TimeEntryPlaneEndpointTest extends ApiEndpointTestAbstract
         // Arrange
         config(['services.plane.api_key' => '']);
         $data = $this->createUserWithPermission(['time-entries:update:own']);
+        $this->enablePlaneFor($data->organization);
         $timeEntry = $this->createStoppedEntry($data->organization, $data->member);
         Passport::actingAs($data->user);
 
@@ -132,13 +141,32 @@ class TimeEntryPlaneEndpointTest extends ApiEndpointTestAbstract
 
         // Assert
         $response->assertStatus(503);
-        $response->assertJsonPath('message', 'The Plane integration is not configured.');
+        $response->assertJsonPath('message', 'The Plane integration is not enabled for this organization.');
+    }
+
+    public function test_review_fails_for_organization_without_plane_integration(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission(['time-entries:update:own']);
+        $this->enablePlaneFor(Organization::factory()->create());
+        $timeEntry = $this->createStoppedEntry($data->organization, $data->member);
+        Http::fake();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->postReview($data->organization, $timeEntry);
+
+        // Assert
+        $response->assertStatus(503);
+        $response->assertJsonPath('message', 'The Plane integration is not enabled for this organization.');
+        Http::assertNothingSent();
     }
 
     public function test_review_returns_502_when_plane_errors(): void
     {
         // Arrange
         $data = $this->createUserWithPermission(['time-entries:update:own']);
+        $this->enablePlaneFor($data->organization);
         $timeEntry = $this->createStoppedEntry($data->organization, $data->member);
         Http::fake([self::BASE.'/work-items/KARA-47/' => Http::response('boom', 500)]);
         Passport::actingAs($data->user);
@@ -155,6 +183,7 @@ class TimeEntryPlaneEndpointTest extends ApiEndpointTestAbstract
     {
         // Arrange
         $data = $this->createUserWithPermission(['time-entries:update:own']);
+        $this->enablePlaneFor($data->organization);
         $otherMember = Member::factory()->forOrganization($data->organization)->create();
         $timeEntry = $this->createStoppedEntry($data->organization, $otherMember);
         Http::fake();
@@ -172,6 +201,7 @@ class TimeEntryPlaneEndpointTest extends ApiEndpointTestAbstract
     {
         // Arrange
         $data = $this->createUserWithPermission(['time-entries:update:own', 'time-entries:update:all']);
+        $this->enablePlaneFor($data->organization);
         $otherOrganization = Organization::factory()->create();
         $otherMember = Member::factory()->forOrganization($otherOrganization)->create();
         $timeEntry = $this->createStoppedEntry($otherOrganization, $otherMember);

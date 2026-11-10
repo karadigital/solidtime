@@ -39,7 +39,7 @@ class TimeEntryPlaneObserver
         if ($timeEntry->end !== null || $timeEntry->task_id === null) {
             return;
         }
-        if (! $this->planeClient->isConfigured()) {
+        if (! $this->planeClient->isEnabledForOrganization($timeEntry->organization_id)) {
             return;
         }
 
