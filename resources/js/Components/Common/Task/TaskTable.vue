@@ -12,6 +12,12 @@ import type { Task } from '@/packages/api/src';
 const props = defineProps<{
     projectId: string;
     tasks: Task[];
+    selectable?: boolean;
+    selectedTaskId?: string | null;
+}>();
+
+const emit = defineEmits<{
+    select: [task: Task];
 }>();
 
 const createTask = ref(false);
@@ -43,7 +49,11 @@ const createTask = ref(false);
                     </SecondaryButton>
                 </div>
                 <template v-for="task in tasks" :key="task.id">
-                    <TaskTableRow :task="task"></TaskTableRow>
+                    <TaskTableRow
+                        :task="task"
+                        :selectable="selectable"
+                        :selected="selectable && task.id === selectedTaskId"
+                        @select="emit('select', task)"></TaskTableRow>
                 </template>
             </div>
         </div>
