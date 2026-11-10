@@ -30,10 +30,8 @@ const { currentTimeEntry } = storeToRefs(useCurrentTimeEntryStore());
 const { setActiveState } = useCurrentTimeEntryStore();
 
 async function startTaskTimer() {
-    if (currentTimeEntry.value.id) {
-        // Replace the main timer; other running timers keep running (KARA-98)
-        await setActiveState(false, { promoteNextTimer: false });
-    }
+    // Replace the main timer; other running timers keep running (KARA-98)
+    await useCurrentTimeEntryStore().prepareQuickStart();
     currentTimeEntry.value.description = props.timeEntry.description;
     currentTimeEntry.value.project_id = props.timeEntry.project_id;
     currentTimeEntry.value.task_id = props.timeEntry.task_id;

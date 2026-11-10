@@ -19,7 +19,6 @@ import {
 import { SecondaryButton } from '@/packages/ui/src';
 import { computed, onMounted, ref, watch } from 'vue';
 import { getDayJsInstance, getLocalizedDayJs } from '@/packages/ui/src/utils/time';
-import { storeToRefs } from 'pinia';
 import {
     api,
     type Client,
@@ -113,8 +112,7 @@ function getFilterAttributes() {
 }
 
 const currentTimeEntryStore = useCurrentTimeEntryStore();
-const { currentTimeEntry } = storeToRefs(currentTimeEntryStore);
-const { setActiveState, startLiveTimer } = currentTimeEntryStore;
+const { startLiveTimer } = currentTimeEntryStore;
 const { handleApiRequestNotifications } = useNotificationsStore();
 
 const {
@@ -189,10 +187,8 @@ async function createClient(body: CreateClientBody): Promise<Client | undefined>
 }
 
 async function startTimeEntryFromExisting(entry: TimeEntry) {
-    if (currentTimeEntry.value.id) {
-        // Replace the main timer; other running timers keep running (KARA-98)
-        await setActiveState(false, { promoteNextTimer: false });
-    }
+    // Replace the main timer; other running timers keep running (KARA-98)
+    await currentTimeEntryStore.prepareQuickStart();
     await createTimeEntry({
         project_id: entry.project_id,
         task_id: entry.task_id,

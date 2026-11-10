@@ -54,6 +54,14 @@ export const useCurrentTimeEntryStore = defineStore('currentTimeEntry', () => {
      * True after "New timer" until a timer is started or focused: the tracker holds a draft that a fetch must keep.
      */
     const composingNewTimer = ref(false);
+    // Persisted next to the draft, so other tabs and reloads keep treating it as a new timer
+    useLocalStorage('solidtime/composing-new-timer', composingNewTimer);
+
+    /**
+     * Guards against starting the same timer twice (double click / double Enter): the server allows parallel
+     * running timers, so it no longer rejects the second request.
+     */
+    const isStarting = ref(false);
 
     function $reset() {
         currentTimeEntry.value = { ...emptyTimeEntry };
@@ -91,6 +99,10 @@ export const useCurrentTimeEntryStore = defineStore('currentTimeEntry', () => {
             return;
         }
 
+        if (composingNewTimer.value && currentTimeEntry.value.id !== '') {
+            // The tracker holds a running timer again (f.e. written by another tab): no longer composing
+            composingNewTimer.value = false;
+        }
         if (composingNewTimer.value) {
             backgroundTimeEntries.value = running;
         } else {
@@ -139,8 +151,13 @@ export const useCurrentTimeEntryStore = defineStore('currentTimeEntry', () => {
                 'Timer started!'
             );
             if (response?.data) {
+                const startedId = response.data.id;
                 currentTimeEntry.value = response.data;
                 composingNewTimer.value = false;
+                // A fetch during the request may already have listed the new timer
+                backgroundTimeEntries.value = backgroundTimeEntries.value.filter(
+                    (timeEntry) => timeEntry.id !== startedId
+                );
             }
         } else {
             throw new Error(
@@ -301,8 +318,16 @@ export const useCurrentTimeEntryStore = defineStore('currentTimeEntry', () => {
         options: { offerPlaneReview?: boolean; promoteNextTimer?: boolean } = {}
     ) {
         if (newState) {
-            startLiveTimer();
-            await startTimer();
+            if (isStarting.value) {
+                return;
+            }
+            isStarting.value = true;
+            try {
+                startLiveTimer();
+                await startTimer();
+            } finally {
+                isStarting.value = false;
+            }
         } else {
             const stoppedTimeEntryId = currentTimeEntry.value.id;
             const stoppedTaskId = currentTimeEntry.value.task_id;
@@ -320,6 +345,18 @@ export const useCurrentTimeEntryStore = defineStore('currentTimeEntry', () => {
             }
         }
         queryClient.invalidateQueries({ queryKey: ['timeEntries'] });
+    }
+
+    /**
+     * For quick-start actions (play on an entry, recently tracked, ...) that replace the main timer: stops the main
+     * timer if one runs, without touching background timers, and ends composing so the next fetch shows the started
+     * timer in the tracker.
+     */
+    async function prepareQuickStart() {
+        if (currentTimeEntry.value.id !== '') {
+            await setActiveState(false, { promoteNextTimer: false });
+        }
+        composingNewTimer.value = false;
     }
 
     /**
@@ -414,6 +451,7 @@ export const useCurrentTimeEntryStore = defineStore('currentTimeEntry', () => {
         composingNewTimer,
         hasRunningTimers,
         startAnotherTimer,
+        prepareQuickStart,
         focusTimer,
         stopBackgroundTimer,
         $reset,

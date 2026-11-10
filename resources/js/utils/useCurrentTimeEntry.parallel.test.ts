@@ -225,4 +225,91 @@ describe('useCurrentTimeEntryStore with parallel timers', () => {
         expect(store.currentTimeEntry.id).toBe('r1');
         expect(ids(store.backgroundTimeEntries)).toEqual(['r2']);
     });
+
+    it('does not start twice when Start is pressed twice quickly', async () => {
+        const store = useCurrentTimeEntryStore();
+        let resolveCreate: (value: unknown) => void = () => undefined;
+        api.createTimeEntry.mockReturnValue(
+            new Promise((resolve) => {
+                resolveCreate = resolve;
+            })
+        );
+
+        const first = store.setActiveState(true);
+        const second = store.setActiveState(true);
+        resolveCreate({ data: { ...running('r3', 0) } });
+        await Promise.all([first, second]);
+
+        expect(api.createTimeEntry).toHaveBeenCalledTimes(1);
+        expect(store.currentTimeEntry.id).toBe('r3');
+    });
+
+    it('never lists the main timer as a background timer while composing', async () => {
+        runningOnServer(r2, r1);
+        const store = useCurrentTimeEntryStore();
+        await store.fetchCurrentTimeEntry();
+        store.startAnotherTimer();
+        // Another tab wrote a running timer into the shared tracker state
+        store.currentTimeEntry = { ...r2 };
+
+        await store.fetchCurrentTimeEntry();
+
+        expect(store.currentTimeEntry.id).toBe('r2');
+        expect(ids(store.backgroundTimeEntries)).toEqual(['r1']);
+        expect(store.composingNewTimer).toBe(false);
+    });
+
+    it('a fetch during start does not list the new timer twice', async () => {
+        runningOnServer(r1);
+        const store = useCurrentTimeEntryStore();
+        await store.fetchCurrentTimeEntry();
+        store.startAnotherTimer();
+        const r3 = running('r3', 0);
+        let resolveCreate: (value: unknown) => void = () => undefined;
+        api.createTimeEntry.mockReturnValue(
+            new Promise((resolve) => {
+                resolveCreate = resolve;
+            })
+        );
+
+        const starting = store.setActiveState(true);
+        runningOnServer(r3, r1);
+        await store.fetchCurrentTimeEntry();
+        resolveCreate({ data: { ...r3 } });
+        await starting;
+
+        expect(store.currentTimeEntry.id).toBe('r3');
+        expect(ids(store.backgroundTimeEntries)).toEqual(['r1']);
+    });
+
+    it('a quick-start while composing makes the new timer the main one', async () => {
+        runningOnServer(r1);
+        const store = useCurrentTimeEntryStore();
+        await store.fetchCurrentTimeEntry();
+        store.startAnotherTimer();
+
+        await store.prepareQuickStart();
+        const r3 = running('r3', 0);
+        runningOnServer(r3, r1);
+        await store.fetchCurrentTimeEntry();
+
+        expect(api.updateTimeEntry).not.toHaveBeenCalled();
+        expect(store.currentTimeEntry.id).toBe('r3');
+        expect(ids(store.backgroundTimeEntries)).toEqual(['r1']);
+    });
+
+    it('a quick-start replaces the running main timer only', async () => {
+        runningOnServer(r2, r1);
+        const store = useCurrentTimeEntryStore();
+        await store.fetchCurrentTimeEntry();
+        api.updateTimeEntry.mockResolvedValue({ data: { ...r2, end: 'x' } });
+
+        await store.prepareQuickStart();
+
+        expect(api.updateTimeEntry.mock.calls[0]![1]).toMatchObject({
+            params: { timeEntry: 'r2' },
+        });
+        expect(store.currentTimeEntry.id).toBe('');
+        expect(ids(store.backgroundTimeEntries)).toEqual(['r1']);
+    });
 });
