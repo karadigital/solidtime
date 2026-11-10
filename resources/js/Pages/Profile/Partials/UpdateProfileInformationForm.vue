@@ -3,7 +3,8 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 import ActionMessage from '@/Components/ActionMessage.vue';
 import FormSection from '@/Components/FormSection.vue';
-import { Field, FieldError, FieldLabel } from '@/packages/ui/src/field';
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/packages/ui/src/field';
+import { Checkbox } from '@/packages/ui/src';
 import { Button } from '@/packages/ui/src/Buttons';
 import PrimaryButton from '@/packages/ui/src/Buttons/PrimaryButton.vue';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
@@ -26,6 +27,8 @@ const name = ref('');
 const email = ref('');
 const timezone = ref('');
 const weekStart = ref('');
+const autoStopTimeEntries = ref(false);
+const autoStopTime = ref('');
 
 const photoBase64 = ref<string | null>(null);
 const photoPreview = ref<string | null>(null);
@@ -40,6 +43,8 @@ function seedForm(u: User) {
     email.value = u.email;
     timezone.value = u.timezone;
     weekStart.value = u.week_start;
+    autoStopTimeEntries.value = u.auto_stop_time_entries;
+    autoStopTime.value = u.auto_stop_time;
 }
 
 watch(
@@ -78,6 +83,10 @@ function buildPayload(): UpdateUserBody {
     if (weekStart.value !== user.value.week_start) {
         body.week_start = weekStart.value as UpdateUserBody['week_start'];
     }
+    if (autoStopTimeEntries.value !== user.value.auto_stop_time_entries) {
+        body.auto_stop_time_entries = autoStopTimeEntries.value;
+    }
+    if (autoStopTime.value !== user.value.auto_stop_time) body.auto_stop_time = autoStopTime.value;
     if (photoBase64.value !== null) body.photo = photoBase64.value;
     return body;
 }
@@ -329,6 +338,40 @@ const page = usePage<{
                     </option>
                 </select>
                 <FieldError v-if="fieldErrors.week_start">{{ fieldErrors.week_start }}</FieldError>
+            </Field>
+
+            <!-- Auto stop -->
+            <Field class="col-span-6 sm:col-span-4">
+                <div class="flex items-center gap-2">
+                    <Checkbox
+                        id="auto_stop_time_entries"
+                        v-model:checked="autoStopTimeEntries"
+                        :disabled="!isUserLoaded" />
+                    <FieldLabel for="auto_stop_time_entries">
+                        Automatically stop my running timer at the end of the workday
+                    </FieldLabel>
+                </div>
+                <FieldError v-if="fieldErrors.auto_stop_time_entries">
+                    {{ fieldErrors.auto_stop_time_entries }}
+                </FieldError>
+            </Field>
+
+            <Field class="col-span-6 sm:col-span-4">
+                <FieldLabel for="auto_stop_time">Stop time</FieldLabel>
+                <TextInput
+                    id="auto_stop_time"
+                    v-model="autoStopTime"
+                    type="time"
+                    name="auto_stop_time"
+                    class="block w-40"
+                    :disabled="!isUserLoaded || !autoStopTimeEntries" />
+                <FieldDescription>
+                    Applies Monday to Friday in your timezone. Timers started after this time keep
+                    running. You will get an email when your timer is stopped.
+                </FieldDescription>
+                <FieldError v-if="fieldErrors.auto_stop_time">
+                    {{ fieldErrors.auto_stop_time }}
+                </FieldError>
             </Field>
         </template>
 

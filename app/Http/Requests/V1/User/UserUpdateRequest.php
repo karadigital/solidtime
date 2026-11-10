@@ -58,6 +58,14 @@ class UserUpdateRequest extends BaseFormRequest
             'week_start' => [
                 Rule::enum(Weekday::class),
             ],
+            // Whether running time entries of the user are stopped automatically at auto_stop_time (Monday to Friday)
+            'auto_stop_time_entries' => [
+                'boolean',
+            ],
+            // Time of day in the user's timezone at which running time entries are stopped automatically (Format: "H:i", Example: "17:30")
+            'auto_stop_time' => [
+                'date_format:H:i',
+            ],
         ];
     }
 
@@ -79,6 +87,16 @@ class UserUpdateRequest extends BaseFormRequest
     public function getWeekStart(): ?Weekday
     {
         return $this->has('week_start') ? Weekday::from($this->input('week_start')) : null;
+    }
+
+    public function getAutoStopTimeEntries(): ?bool
+    {
+        return $this->has('auto_stop_time_entries') ? $this->boolean('auto_stop_time_entries') : null;
+    }
+
+    public function getAutoStopTime(): ?string
+    {
+        return $this->has('auto_stop_time') ? (string) $this->input('auto_stop_time') : null;
     }
 
     public function hasPhotoKey(): bool
