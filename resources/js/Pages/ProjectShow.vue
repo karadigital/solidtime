@@ -3,7 +3,7 @@ import MainContainer from '@/packages/ui/src/MainContainer.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { FolderIcon, PlusIcon } from '@heroicons/vue/20/solid';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import { useProjectsQuery } from '@/utils/useProjectsQuery';
 import {
     ChevronRightIcon,
@@ -44,6 +44,15 @@ const createTask = ref(false);
 const showProjectMembers = ref(false);
 const planeIntegrationEnabled = isPlaneIntegrationEnabled();
 const selectedTask = ref<Task | null>(null);
+const ticketDetail = ref<HTMLElement | null>(null);
+
+function selectTask(task: Task) {
+    selectedTask.value = task;
+    // Below lg the panel sits under the (often long) task list, so bring it into view.
+    if (!window.matchMedia('(min-width: 1024px)').matches) {
+        nextTick(() => ticketDetail.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    }
+}
 const projectId = route()?.params?.project as string;
 
 // TanStack Query automatically fetches project members when component mounts
@@ -182,12 +191,15 @@ const shownTasks = computed(() => {
                             :project-id="projectId"
                             :selectable="planeIntegrationEnabled"
                             :selected-task-id="selectedTask?.id ?? null"
-                            @select="selectedTask = $event"></TaskTable>
+                            @select="selectTask"></TaskTable>
                     </Card>
                 </div>
-                <div v-if="planeIntegrationEnabled">
+                <div
+                    v-if="planeIntegrationEnabled"
+                    ref="ticketDetail"
+                    class="scroll-mt-4 lg:sticky lg:top-4 lg:self-start">
                     <CardTitle title="Ticket Detail" :icon="DocumentTextIcon"></CardTitle>
-                    <Card>
+                    <Card class="lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
                         <PlaneWorkItemPanel :task="selectedTask"></PlaneWorkItemPanel>
                     </Card>
                 </div>

@@ -64,6 +64,26 @@ class PlaneDescriptionSanitizerTest extends TestCase
     {
         $this->assertSame('', $this->sanitize(null));
         $this->assertSame('', $this->sanitize(''));
-        $this->assertSame('<p></p>', $this->sanitize('<p></p>'));
+        $this->assertSame('', $this->sanitize('<p></p>'));
+        $this->assertSame('', $this->sanitize('<p class="editor-paragraph-block"></p><p> </p>'));
+    }
+
+    public function test_replaces_plain_images_with_a_placeholder_and_drops_remote_media(): void
+    {
+        $result = $this->sanitize('<p>a</p><img src="https://evil.example/track.gif?u=1"><img srcset="https://evil.example/a.png 1x"><video src="https://evil.example/v.mp4" poster="https://evil.example/p.png"></video><audio src="https://evil.example/a.mp3"></audio><picture><source srcset="https://evil.example/b.png"></picture>');
+
+        $this->assertStringNotContainsString('evil.example', $result);
+        foreach (['<img', '<video', '<audio', '<source', '<picture'] as $forbidden) {
+            $this->assertStringNotContainsString($forbidden, $result);
+        }
+        $this->assertStringContainsString('[Image – open in Plane to view]', $result);
+    }
+
+    public function test_drops_id_and_name_attributes(): void
+    {
+        $result = $this->sanitize('<p id="app">a</p><a id="Ziggy" name="Ziggy" href="https://plane.test">b</a><span name="querySelector">c</span>');
+
+        $this->assertStringNotContainsString(' id=', $result);
+        $this->assertStringNotContainsString(' name=', $result);
     }
 }

@@ -27,8 +27,13 @@ class PlaneDescriptionSanitizer
         // Security does not depend on these replacements: the sanitizer below removes everything unsafe.
         $html = (string) preg_replace('/<image-component\b[^>]*>(\s*<\/image-component>)?/i', self::IMAGE_PLACEHOLDER, $html);
         $html = (string) preg_replace('/<mention-component\b[^>]*>(\s*<\/mention-component>)?/i', self::MENTION_PLACEHOLDER, $html);
+        // Plain images would load from any host and let a Plane author track who opens the ticket.
+        $html = (string) preg_replace('/<img\b[^>]*>/i', self::IMAGE_PLACEHOLDER, $html);
 
-        return $this->sanitizer()->sanitize($html);
+        $sanitized = $this->sanitizer()->sanitize($html);
+
+        // Plane stores an empty description as "<p></p>".
+        return trim(html_entity_decode(strip_tags($sanitized))) === '' ? '' : $sanitized;
     }
 
     private function sanitizer(): HtmlSanitizer
@@ -41,6 +46,16 @@ class PlaneDescriptionSanitizer
             ->forceAttribute('a', 'rel', 'noopener noreferrer')
             ->dropAttribute('class', '*')
             ->dropAttribute('data-id', '*')
+            // id/name could clobber DOM globals (f.e. document.querySelector) or collide with ids of the page
+            ->dropAttribute('id', '*')
+            ->dropAttribute('name', '*')
+            // No remote media: it would be loaded from any host the Plane author chooses
+            ->dropElement('img')
+            ->dropElement('picture')
+            ->dropElement('source')
+            ->dropElement('video')
+            ->dropElement('audio')
+            ->dropElement('track')
             ->withMaxInputLength(200_000);
 
         return new HtmlSanitizer($config);
