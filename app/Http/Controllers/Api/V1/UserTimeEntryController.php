@@ -9,14 +9,15 @@ use App\Models\Organization;
 use App\Models\TimeEntry;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Log;
 
 class UserTimeEntryController extends Controller
 {
     /**
-     * Get the active time entry of the current user
+     * Get the most recently started running time entry of the current user
      *
+     * A user can have several running time entries, see getMyRunningTimeEntries for all of them.
      * This endpoint is independent of the organization.
      *
      * @operationId getMyActiveTimeEntry
@@ -31,12 +32,6 @@ class UserTimeEntryController extends Controller
             ->orderBy('start', 'desc')
             ->get();
 
-        if ($activeTimeEntriesOfUser->count() > 1) {
-            Log::warning('User has more than one active time entry.', [
-                'user' => $user->getKey(),
-            ]);
-        }
-
         $activeTimeEntry = $activeTimeEntriesOfUser->first();
 
         if ($activeTimeEntry !== null) {
@@ -44,5 +39,25 @@ class UserTimeEntryController extends Controller
         } else {
             throw new ModelNotFoundException('No active time entry');
         }
+    }
+
+    /**
+     * Get all running time entries of the current user
+     *
+     * Newest first. This endpoint is independent of the organization.
+     *
+     * @return AnonymousResourceCollection<int, TimeEntryResource>
+     *
+     * @operationId getMyRunningTimeEntries
+     */
+    public function myRunning(): AnonymousResourceCollection
+    {
+        $runningTimeEntries = TimeEntry::query()
+            ->whereBelongsTo($this->user(), 'user')
+            ->whereNull('end')
+            ->orderBy('start', 'desc')
+            ->get();
+
+        return TimeEntryResource::collection($runningTimeEntries);
     }
 }

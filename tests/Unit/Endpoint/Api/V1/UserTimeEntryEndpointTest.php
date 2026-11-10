@@ -10,7 +10,6 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Laravel\Passport\Passport;
 use PHPUnit\Framework\Attributes\UsesClass;
-use TiMacDonald\Log\LogEntry;
 
 #[UsesClass(UserTimeEntryController::class)]
 class UserTimeEntryEndpointTest extends ApiEndpointTestAbstract
@@ -43,22 +42,20 @@ class UserTimeEntryEndpointTest extends ApiEndpointTestAbstract
         $response->assertJsonPath('data.id', $activeTimeEntry->getKey());
     }
 
-    public function test_my_active_endpoint_logs_a_warning_if_user_has_multiple_active_time_entries_and_return_the_latest_one(): void
+    public function test_my_active_endpoint_returns_the_latest_of_multiple_running_time_entries(): void
     {
         // Arrange
         $data = $this->createUserWithPermission();
         $activeTimeEntry1 = TimeEntry::factory()->forMember($data->member)->active()->start(Carbon::now()->subDay())->create();
         $activeTimeEntry2 = TimeEntry::factory()->forMember($data->member)->active()->start(Carbon::now())->create();
+        $logSpy = Log::spy();
         Passport::actingAs($data->user);
 
         // Act
         $response = $this->getJson(route('api.v1.users.time-entries.my-active'));
 
         // Assert
-        Log::assertLogged(fn (LogEntry $log) => $log->level === 'warning'
-            && $log->message === 'User has more than one active time entry.'
-            && $log->context === ['user' => $data->user->getKey()]
-        );
+        $logSpy->shouldNotHaveReceived('warning');
         $response->assertSuccessful();
         $response->assertJsonPath('data.id', $activeTimeEntry2->getKey());
     }
@@ -75,5 +72,48 @@ class UserTimeEntryEndpointTest extends ApiEndpointTestAbstract
 
         // Assert
         $response->assertNotFound();
+    }
+
+    public function test_my_running_endpoint_returns_all_running_time_entries_newest_first(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission();
+        $older = TimeEntry::factory()->forMember($data->member)->active()->start(Carbon::now()->subHours(2))->create();
+        $newer = TimeEntry::factory()->forMember($data->member)->active()->start(Carbon::now()->subHour())->create();
+        TimeEntry::factory()->forMember($data->member)->create();
+        $otherUser = $this->createUserWithPermission();
+        TimeEntry::factory()->forMember($otherUser->member)->active()->create();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->getJson(route('api.v1.users.time-entries.my-running'));
+
+        // Assert
+        $response->assertStatus(200);
+        $this->assertSame([$newer->getKey(), $older->getKey()], array_column($response->json('data'), 'id'));
+    }
+
+    public function test_my_running_endpoint_returns_an_empty_list_when_nothing_runs(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission();
+        TimeEntry::factory()->forMember($data->member)->create();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->getJson(route('api.v1.users.time-entries.my-running'));
+
+        // Assert
+        $response->assertStatus(200);
+        $response->assertExactJson(['data' => []]);
+    }
+
+    public function test_my_running_endpoint_requires_authentication(): void
+    {
+        // Act
+        $response = $this->getJson(route('api.v1.users.time-entries.my-running'));
+
+        // Assert
+        $response->assertUnauthorized();
     }
 }

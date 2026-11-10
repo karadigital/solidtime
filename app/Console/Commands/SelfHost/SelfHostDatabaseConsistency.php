@@ -77,15 +77,6 @@ class SelfHostDatabaseConsistency extends Command
             ->get();
         $this->logProblems($problems, 'Organizations without an owner', $hadAProblem);
 
-        // Every member can only have one running time entry
-        $problems = DB::table('time_entries')
-            ->select(['user_id as id'])
-            ->whereNull('end')
-            ->groupBy('user_id')
-            ->havingRaw('count(*) > 1')
-            ->get(['user_id', DB::raw('count(*) as count')]);
-        $this->logProblems($problems, 'Users with more than one running time entry', $hadAProblem);
-
         // Users have a current organization that they are not a member of
         $problems = DB::table('users')
             ->select(['users.id as id'])

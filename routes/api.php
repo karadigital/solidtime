@@ -124,6 +124,7 @@ Route::prefix('v1')->name('v1.')->group(static function (): void {
         });
 
         Route::name('users.time-entries.')->group(static function (): void {
+            Route::get('/users/me/time-entries/running', [UserTimeEntryController::class, 'myRunning'])->name('my-running');
             Route::get('/users/me/time-entries/active', [UserTimeEntryController::class, 'myActive'])->name('my-active');
             Route::get('/users/me/time-entries', [UserTimeEntryController::class, 'my'])->name('my'); // TODO
         });

@@ -126,7 +126,7 @@ class SelfHostDatabaseConsistencyCommandTest extends TestCaseWithDatabase
         $this->assertSame("Consistency problem: Organizations without an owner\n  - ".$organization->getKey()."\n", $output);
     }
 
-    public function test_checks_that_every_member_can_only_have_one_running_time_entry(): void
+    public function test_multiple_running_time_entries_are_not_a_consistency_problem(): void
     {
         // Arrange
         $user = $this->createUserWithRole(Role::Owner);
@@ -137,9 +137,9 @@ class SelfHostDatabaseConsistencyCommandTest extends TestCaseWithDatabase
         $exitCode = $this->withoutMockingConsoleOutput()->artisan('self-host:database-consistency');
 
         // Assert
-        $this->assertSame(Command::FAILURE, $exitCode);
+        $this->assertSame(Command::SUCCESS, $exitCode);
         $output = Artisan::output();
-        $this->assertSame("Consistency problem: Users with more than one running time entry\n  - ".$user->user->getKey()."\n", $output);
+        $this->assertStringNotContainsString('more than one running', $output);
     }
 
     public function test_checks_that_users_have_a_current_organization_that_they_are_not_a_member_of(): void

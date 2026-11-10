@@ -5068,6 +5068,21 @@ Please note that the access token is only shown in this response and cannot be r
     },
     {
         method: 'get',
+        path: '/v1/users/me/time-entries/running',
+        alias: 'getMyRunningTimeEntries',
+        description: `Newest first. This endpoint is independent of the organization.`,
+        requestFormat: 'json',
+        response: z.object({ data: z.array(TimeEntryResource) }).passthrough(),
+        errors: [
+            {
+                status: 401,
+                description: `Unauthenticated`,
+                schema: z.object({ message: z.string() }).passthrough(),
+            },
+        ],
+    },
+    {
+        method: 'get',
         path: '/v1/users/me/time-entries/active',
         alias: 'getMyActiveTimeEntry',
         description: `This endpoint is independent of organization.`,
