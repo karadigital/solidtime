@@ -179,6 +179,19 @@ class PlaneStatusServiceTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_returns_work_item_not_found_on_403_for_unknown_project_identifier(): void
+    {
+        // Plane answers 403 (not 404) when the project identifier is unknown (f.e. an old one) or the bot is no member
+        Http::fake([
+            self::BASE.'/work-items/SOPI-293/' => Http::response(['detail' => 'You do not have permission to perform this action.'], 403),
+        ]);
+
+        $result = $this->service()->moveToReview('SOPI-293');
+
+        $this->assertSame(PlaneTransitionOutcome::WorkItemNotFound, $result->outcome);
+        Http::assertSentCount(1);
+    }
+
     public function test_throws_plane_api_exception_on_server_error(): void
     {
         Http::fake([

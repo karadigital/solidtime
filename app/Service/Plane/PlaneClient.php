@@ -22,14 +22,16 @@ class PlaneClient
     }
 
     /**
-     * @return array{id: string, project: string, state: string}|null null if the work item does not exist
+     * @return array{id: string, project: string, state: string}|null null if the work item does not exist or is not
+     *                                                                accessible (Plane answers 403 for an unknown project
+     *                                                                identifier or a project the API user is no member of)
      *
      * @throws PlaneApiException
      */
     public function findWorkItem(string $identifier): ?array
     {
         $response = $this->send(fn (PendingRequest $request): Response => $request->get($this->workspaceUrl('/work-items/'.$identifier.'/')));
-        if ($response->status() === 404) {
+        if ($response->status() === 404 || $response->status() === 403) {
             return null;
         }
         $this->ensureSuccessful($response);

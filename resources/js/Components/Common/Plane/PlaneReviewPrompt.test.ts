@@ -108,7 +108,11 @@ describe('PlaneReviewPrompt', () => {
         findButton('Move to review')!.click();
         await flushPromises();
 
-        expect(addNotification).toHaveBeenCalledWith('error', 'KARA-47 was not found in Plane');
+        expect(addNotification).toHaveBeenCalledWith(
+            'error',
+            'KARA-47 was not found in Plane',
+            'The work item does not exist, or the Plane bot is not a member of its project.'
+        );
     });
 
     it('does nothing for tasks that are not Plane work items', async () => {

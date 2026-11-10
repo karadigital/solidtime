@@ -88,7 +88,7 @@ class TimeEntryPlaneEndpointTest extends ApiEndpointTestAbstract
         // Arrange
         $data = $this->createUserWithPermission(['time-entries:update:own']);
         $timeEntry = $this->createStoppedEntry($data->organization, $data->member, '[SOPI-293] Old identifier');
-        Http::fake([self::BASE.'/work-items/SOPI-293/' => Http::response(['error' => 'not found'], 404)]);
+        Http::fake([self::BASE.'/work-items/SOPI-293/' => Http::response(['detail' => 'You do not have permission to perform this action.'], 403)]);
         Passport::actingAs($data->user);
 
         // Act

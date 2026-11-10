@@ -89,7 +89,11 @@ async function moveToReview() {
             );
             break;
         case 'work_item_not_found':
-            addNotification('error', `${result.identifier} was not found in Plane`);
+            addNotification(
+                'error',
+                `${result.identifier} was not found in Plane`,
+                'The work item does not exist, or the Plane bot is not a member of its project.'
+            );
             break;
     }
 }
