@@ -29,6 +29,7 @@ class TaskPlaneEndpointTest extends ApiEndpointTestAbstract
             'services.plane.api_key' => 'key',
             'services.plane.base_url' => 'https://plane.test',
             'services.plane.workspace_slug' => 'kara',
+            'services.plane.app_url' => null,
         ]);
         Cache::flush();
     }
