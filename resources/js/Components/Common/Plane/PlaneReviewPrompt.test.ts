@@ -7,7 +7,7 @@ import { useCurrentTimeEntryStore } from '@/utils/useCurrentTimeEntry';
 const { api, addNotification, tasks } = vi.hoisted(() => ({
     api: {
         moveTimeEntryTaskToPlaneReview: vi.fn(),
-        getMyActiveTimeEntry: vi.fn(),
+        getMyRunningTimeEntries: vi.fn(),
         updateTimeEntry: vi.fn(),
         createTimeEntry: vi.fn(),
     },

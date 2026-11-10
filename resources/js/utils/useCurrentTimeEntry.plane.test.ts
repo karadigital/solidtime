@@ -5,7 +5,7 @@ import type { TimeEntry } from '@/packages/api/src';
 
 const { api, planeEnabled } = vi.hoisted(() => ({
     api: {
-        getMyActiveTimeEntry: vi.fn(),
+        getMyRunningTimeEntries: vi.fn(),
         updateTimeEntry: vi.fn(),
         createTimeEntry: vi.fn(),
     },
@@ -56,7 +56,7 @@ describe('useCurrentTimeEntryStore Plane review prompt', () => {
         setActivePinia(createPinia());
         vi.clearAllMocks();
         planeEnabled.value = true;
-        api.getMyActiveTimeEntry.mockResolvedValue({ data: { ...runningEntry } });
+        api.getMyRunningTimeEntries.mockResolvedValue({ data: [{ ...runningEntry }] });
     });
 
     it('offers a Plane review after stopping a timer on a task', async () => {

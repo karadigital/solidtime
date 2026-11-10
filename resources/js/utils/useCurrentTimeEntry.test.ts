@@ -5,7 +5,7 @@ import type { TimeEntry } from '@/packages/api/src';
 
 const { api, addNotification } = vi.hoisted(() => ({
     api: {
-        getMyActiveTimeEntry: vi.fn(),
+        getMyRunningTimeEntries: vi.fn(),
         updateTimeEntry: vi.fn(),
         createTimeEntry: vi.fn(),
     },
@@ -42,8 +42,6 @@ const runningEntry = {
     organization_id: 'org-1',
 } as unknown as TimeEntry;
 
-const notFound = Object.assign(new Error('Not found'), { response: { status: 404 } });
-
 describe('useCurrentTimeEntryStore with a timer stopped on the server', () => {
     beforeEach(() => {
         setActivePinia(createPinia());
@@ -51,7 +49,7 @@ describe('useCurrentTimeEntryStore with a timer stopped on the server', () => {
     });
 
     it('does not overwrite the end of a timer that was already stopped on the server', async () => {
-        api.getMyActiveTimeEntry.mockRejectedValue(notFound);
+        api.getMyRunningTimeEntries.mockResolvedValue({ data: [] });
         const store = useCurrentTimeEntryStore();
         store.currentTimeEntry = { ...runningEntry };
 
@@ -67,7 +65,7 @@ describe('useCurrentTimeEntryStore with a timer stopped on the server', () => {
     });
 
     it('stops the timer when it is still running on the server', async () => {
-        api.getMyActiveTimeEntry.mockResolvedValue({ data: { ...runningEntry } });
+        api.getMyRunningTimeEntries.mockResolvedValue({ data: [{ ...runningEntry }] });
         api.updateTimeEntry.mockResolvedValue({ data: { ...runningEntry, end: 'x' } });
         const store = useCurrentTimeEntryStore();
         store.currentTimeEntry = { ...runningEntry };
@@ -80,7 +78,7 @@ describe('useCurrentTimeEntryStore with a timer stopped on the server', () => {
     });
 
     it('does not update a timer that was already stopped on the server', async () => {
-        api.getMyActiveTimeEntry.mockRejectedValue(notFound);
+        api.getMyRunningTimeEntries.mockResolvedValue({ data: [] });
         const store = useCurrentTimeEntryStore();
         store.currentTimeEntry = { ...runningEntry, description: 'Changed' };
 
