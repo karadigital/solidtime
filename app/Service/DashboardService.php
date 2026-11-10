@@ -338,16 +338,22 @@ class DashboardService
     }
 
     /**
-     * Rhe 4 most recently active members of your team with member_id, name, description of the latest time entry, time_entry_id, task_id and a boolean status if the team member is currently working
+     * All members of your team that are currently working, followed by the most recently active members that are not
+     * working until the list has at least 4 entries. Each entry contains member_id, name, description of the
+     * (running or latest) time entry, time_entry_id, task_id and a boolean status if the team member is currently working
      *
      * @return array<int, array{member_id: string, name: string, description: string|null, time_entry_id: string, task_id: string|null, status: bool }>
      */
     public function latestTeamActivity(Organization $organization): array
     {
-        $timeEntries = TimeEntry::query()
+        $minimumEntries = 4;
+
+        $latestTimeEntryPerMember = TimeEntry::query()
             ->select(DB::raw('distinct on (member_id) member_id, description, id, task_id, start, "end"'))
             ->whereBelongsTo($organization, 'organization')
             ->orderBy('member_id')
+            // A running time entry is preferred over a later started stopped one, so that working members are detected
+            ->orderByRaw('"end" is null desc')
             ->orderBy('start', 'desc')
             // Note: limit here does not work because of the distinct on
             ->with([
@@ -356,8 +362,13 @@ class DashboardService
                 ],
             ])
             ->get()
-            ->sortByDesc('start')
-            ->slice(0, 4);
+            ->sortByDesc('start');
+
+        [$working, $idle] = $latestTimeEntryPerMember->partition(
+            fn (TimeEntry $timeEntry): bool => $timeEntry->end === null
+        );
+
+        $timeEntries = $working->concat($idle->take(max(0, $minimumEntries - $working->count())));
 
         $response = [];
 
