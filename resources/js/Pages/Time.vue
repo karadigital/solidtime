@@ -58,7 +58,8 @@ const { setActiveState } = currentTimeEntryStore;
 
 async function startTimeEntry(timeEntry: Omit<CreateTimeEntryBody, 'member_id'>) {
     if (currentTimeEntry.value.id) {
-        await setActiveState(false);
+        // Replace the main timer; other running timers keep running (KARA-98)
+        await setActiveState(false, { promoteNextTimer: false });
     }
     await createTimeEntryMutation(timeEntry);
     useCurrentTimeEntryStore().fetchCurrentTimeEntry();

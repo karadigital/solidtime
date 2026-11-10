@@ -8,7 +8,7 @@ import TimeTrackerStartStop from '@/packages/ui/src/TimeTrackerStartStop.vue';
 import { getCurrentOrganizationId } from '@/utils/useUser';
 
 const store = useCurrentTimeEntryStore();
-const { currentTimeEntry, now, isActive } = storeToRefs(store);
+const { currentTimeEntry, now, isActive, backgroundTimeEntries } = storeToRefs(store);
 const { setActiveState } = store;
 
 const currentTime = computed(() => {
@@ -44,8 +44,14 @@ const isRunningInDifferentOrganization = computed(() => {
         </div>
         <div>
             <div class="text-text-secondary font-medium text-xs">Current Timer</div>
-            <div class="text-text-primary font-medium text-base">
+            <div class="flex items-center gap-1.5 text-text-primary font-medium text-base">
                 {{ currentTime }}
+                <span
+                    v-if="backgroundTimeEntries.length > 0"
+                    class="rounded bg-quaternary px-1 text-xs text-text-secondary"
+                    :title="`${backgroundTimeEntries.length} more timer(s) running`">
+                    +{{ backgroundTimeEntries.length }}
+                </span>
             </div>
         </div>
         <TimeTrackerStartStop

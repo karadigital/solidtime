@@ -190,7 +190,8 @@ async function createClient(body: CreateClientBody): Promise<Client | undefined>
 
 async function startTimeEntryFromExisting(entry: TimeEntry) {
     if (currentTimeEntry.value.id) {
-        await setActiveState(false);
+        // Replace the main timer; other running timers keep running (KARA-98)
+        await setActiveState(false, { promoteNextTimer: false });
     }
     await createTimeEntry({
         project_id: entry.project_id,
