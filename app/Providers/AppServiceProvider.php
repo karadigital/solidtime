@@ -16,6 +16,7 @@ use App\Models\Tag;
 use App\Models\Task;
 use App\Models\TimeEntry;
 use App\Models\User;
+use App\Observers\TimeEntryPlaneObserver;
 use App\Service\BillingContract;
 use App\Service\IpLookup\IpLookupServiceContract;
 use App\Service\IpLookup\NoIpLookupService;
@@ -70,6 +71,7 @@ class AppServiceProvider extends ServiceProvider
             'user' => User::class,
         ]);
         Model::unguard();
+        TimeEntry::observe(TimeEntryPlaneObserver::class);
 
         // Filament
         Section::configureUsing(function (Section $section): void {

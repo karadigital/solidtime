@@ -15,6 +15,12 @@ import type { Organization } from '@/packages/api/src';
 
 const props = defineProps<{
     task: Task;
+    selectable?: boolean;
+    selected?: boolean;
+}>();
+
+const emit = defineEmits<{
+    select: [];
 }>();
 
 const organization = inject<ComputedRef<Organization>>('organization');
@@ -34,10 +40,18 @@ const showTaskEditModal = ref(false);
 </script>
 
 <template>
-    <TableRow>
+    <TableRow :class="selected ? '[&>*]:!bg-card-background-active' : ''">
         <div
             class="whitespace-nowrap min-w-0 flex items-center space-x-5 3xl:pl-12 py-4 pr-3 text-sm font-medium text-text-primary pl-4 sm:pl-6 lg:pl-8 3xl:pl-12">
-            <span class="overflow-ellipsis overflow-hidden">
+            <button
+                v-if="selectable"
+                type="button"
+                class="overflow-ellipsis overflow-hidden text-left hover:underline focus-visible:underline focus-visible:outline-none"
+                :aria-current="selected ? 'true' : undefined"
+                @click="emit('select')">
+                {{ task.name }}
+            </button>
+            <span v-else class="overflow-ellipsis overflow-hidden">
                 {{ task.name }}
             </span>
         </div>

@@ -50,6 +50,29 @@ class HandleInertiaRequestsMiddlewareTest extends MiddlewareTestAbstract
         );
     }
 
+    public function test_shares_plane_integration_enabled(): void
+    {
+        // Arrange
+        $user = $this->createUserWithPermission();
+        $route = $this->createTestRoute();
+        Passport::actingAs($user->user);
+
+        // Act & Assert
+        config([
+            'services.plane.api_key' => 'key',
+            'services.plane.base_url' => 'https://plane.test',
+            'services.plane.workspace_slug' => 'kara',
+            'services.plane.organization_id' => $user->organization->getKey(),
+        ]);
+        $this->get($route)->assertInertia(fn (Assert $page) => $page->where('plane_integration_enabled', true));
+
+        config(['services.plane.organization_id' => 'another-organization']);
+        $this->get($route)->assertInertia(fn (Assert $page) => $page->where('plane_integration_enabled', false));
+
+        config(['services.plane.organization_id' => $user->organization->getKey(), 'services.plane.api_key' => null]);
+        $this->get($route)->assertInertia(fn (Assert $page) => $page->where('plane_integration_enabled', false));
+    }
+
     public function test_adds_billing_information_to_shared_data_of_inertia_requests_with_active_trial(): void
     {
         // Arrange

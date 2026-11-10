@@ -3,13 +3,14 @@ import MainContainer from '@/packages/ui/src/MainContainer.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { FolderIcon, PlusIcon } from '@heroicons/vue/20/solid';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import { useProjectsQuery } from '@/utils/useProjectsQuery';
 import {
     ChevronRightIcon,
     CheckCircleIcon,
     UserGroupIcon,
     PencilSquareIcon,
+    DocumentTextIcon,
 } from '@heroicons/vue/20/solid';
 
 import { Link } from '@inertiajs/vue3';
@@ -17,8 +18,10 @@ import TaskCreateModal from '@/Components/Common/Task/TaskCreateModal.vue';
 import TaskTable from '@/Components/Common/Task/TaskTable.vue';
 import CardTitle from '@/packages/ui/src/CardTitle.vue';
 import Card from '@/Components/Common/Card.vue';
-import ProjectMemberTable from '@/Components/Common/ProjectMember/ProjectMemberTable.vue';
-import ProjectMemberCreateModal from '@/Components/Common/ProjectMember/ProjectMemberCreateModal.vue';
+import ProjectMembersModal from '@/Components/Common/ProjectMember/ProjectMembersModal.vue';
+import PlaneWorkItemPanel from '@/Components/Common/Plane/PlaneWorkItemPanel.vue';
+import { isPlaneIntegrationEnabled } from '@/utils/plane';
+import type { Task } from '@/packages/api/src';
 import { useProjectMembersQuery } from '@/utils/useProjectMembersQuery';
 import { canCreateProjects, canCreateTasks, canViewProjectMembers } from '@/utils/permissions';
 import { TabBar, TabBarItem } from '@/packages/ui/src';
@@ -38,7 +41,18 @@ const project = computed(() => {
     return projects.value.find((project) => project.id === route().params.project) ?? null;
 });
 const createTask = ref(false);
-const createProjectMember = ref(false);
+const showProjectMembers = ref(false);
+const planeIntegrationEnabled = isPlaneIntegrationEnabled();
+const selectedTask = ref<Task | null>(null);
+const ticketDetail = ref<HTMLElement | null>(null);
+
+function selectTask(task: Task) {
+    selectedTask.value = task;
+    // Below lg the panel sits under the (often long) task list, so bring it into view.
+    if (!window.matchMedia('(min-width: 1024px)').matches) {
+        nextTick(() => ticketDetail.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    }
+}
 const projectId = route()?.params?.project as string;
 
 // TanStack Query automatically fetches project members when component mounts
@@ -121,7 +135,18 @@ const shownTasks = computed(() => {
                     <Badge>{{ project?.is_public ? 'Public' : 'Private' }}</Badge>
                 </div>
             </nav>
-            <div>
+            <div class="flex items-center gap-2">
+                <SecondaryButton
+                    v-if="canViewProjectMembers()"
+                    :icon="UserGroupIcon"
+                    @click="showProjectMembers = true">
+                    Show Member
+                </SecondaryButton>
+                <ProjectMembersModal
+                    v-if="canViewProjectMembers()"
+                    v-model:show="showProjectMembers"
+                    :project-id="projectId"
+                    :project-members="projectMembers"></ProjectMembersModal>
                 <SecondaryButton
                     v-if="canCreateProjects()"
                     :icon="PencilSquareIcon"
@@ -135,7 +160,9 @@ const shownTasks = computed(() => {
             </div>
         </MainContainer>
         <MainContainer>
-            <div class="grid lg:grid-cols-2 gap-x-6 pt-6">
+            <div
+                class="grid gap-x-6 gap-y-6 pt-6"
+                :class="planeIntegrationEnabled ? 'lg:grid-cols-2' : 'grid-cols-1'">
                 <div>
                     <CardTitle title="Tasks" :icon="CheckCircleIcon">
                         <template #actions>
@@ -159,25 +186,21 @@ const shownTasks = computed(() => {
                         </template>
                     </CardTitle>
                     <Card>
-                        <TaskTable :tasks="shownTasks" :project-id="projectId"></TaskTable>
+                        <TaskTable
+                            :tasks="shownTasks"
+                            :project-id="projectId"
+                            :selectable="planeIntegrationEnabled"
+                            :selected-task-id="selectedTask?.id ?? null"
+                            @select="selectTask"></TaskTable>
                     </Card>
                 </div>
-                <div v-if="canViewProjectMembers()">
-                    <CardTitle title="Project Members" :icon="UserGroupIcon">
-                        <template #actions>
-                            <SecondaryButton :icon="PlusIcon" @click="createProjectMember = true">
-                                Add Member
-                            </SecondaryButton>
-                            <ProjectMemberCreateModal
-                                v-model:show="createProjectMember"
-                                :project-id="projectId"
-                                :existing-members="projectMembers"></ProjectMemberCreateModal>
-                        </template>
-                    </CardTitle>
-                    <Card>
-                        <ProjectMemberTable
-                            :project-members="projectMembers"
-                            :project-id="projectId"></ProjectMemberTable>
+                <div
+                    v-if="planeIntegrationEnabled"
+                    ref="ticketDetail"
+                    class="scroll-mt-4 lg:sticky lg:top-4 lg:self-start">
+                    <CardTitle title="Ticket Detail" :icon="DocumentTextIcon"></CardTitle>
+                    <Card class="lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
+                        <PlaneWorkItemPanel :task="selectedTask"></PlaneWorkItemPanel>
                     </Card>
                 </div>
             </div>
