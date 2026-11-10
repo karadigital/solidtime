@@ -10,6 +10,7 @@ use App\Models\Organization;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TimeEntry;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Testing\TestResponse;
 use Laravel\Passport\Passport;
@@ -54,6 +55,9 @@ class TimeEntryPlaneEndpointTest extends ApiEndpointTestAbstract
         ]);
     }
 
+    /**
+     * @return TestResponse<JsonResponse>
+     */
     private function postReview(Organization $organization, TimeEntry $timeEntry): TestResponse
     {
         return $this->postJson(route('api.v1.time-entries.plane-review', [$organization->getKey(), $timeEntry->getKey()]));
