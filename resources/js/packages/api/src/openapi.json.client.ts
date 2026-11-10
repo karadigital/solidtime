@@ -4762,6 +4762,83 @@ The task has to be named after the work item, f.e. "[KARA-47] Title".`,
         ],
     },
     {
+        method: 'get',
+        path: '/v1/organizations/:organization/tasks/:task/plane',
+        alias: 'getTaskPlaneWorkItem',
+        description: `Read-only details of the Plane work item the task is named after, f.e. "[KARA-48] Title".
+The description is sanitized HTML; images are replaced by a placeholder.`,
+        requestFormat: 'json',
+        parameters: [
+            {
+                name: 'organization',
+                type: 'Path',
+                schema: z.string(),
+            },
+            {
+                name: 'task',
+                type: 'Path',
+                schema: z.string(),
+            },
+        ],
+        response: z
+            .object({
+                data: z
+                    .object({
+                        identifier: z.string(),
+                        name: z.string(),
+                        url: z.string(),
+                        state: z.union([
+                            z
+                                .object({ name: z.string(), color: z.string(), group: z.string() })
+                                .passthrough(),
+                            z.null(),
+                        ]),
+                        priority: z.string(),
+                        assignees: z.array(z.object({ display_name: z.string() }).passthrough()),
+                        labels: z.array(
+                            z.object({ name: z.string(), color: z.string() }).passthrough()
+                        ),
+                        start_date: z.union([z.string(), z.null()]),
+                        target_date: z.union([z.string(), z.null()]),
+                        description_html: z.string(),
+                    })
+                    .passthrough(),
+            })
+            .passthrough(),
+        errors: [
+            {
+                status: 401,
+                description: `Unauthenticated`,
+                schema: z.object({ message: z.string() }).passthrough(),
+            },
+            {
+                status: 403,
+                description: `Authorization error`,
+                schema: z.object({ message: z.string() }).passthrough(),
+            },
+            {
+                status: 404,
+                description: `Work item not found in Plane`,
+                schema: z.object({ message: z.string() }).passthrough(),
+            },
+            {
+                status: 422,
+                description: `Task not linked to a Plane work item`,
+                schema: z.object({ message: z.string() }).passthrough(),
+            },
+            {
+                status: 502,
+                description: `Plane could not be reached`,
+                schema: z.object({ message: z.string() }).passthrough(),
+            },
+            {
+                status: 503,
+                description: `Plane integration not enabled`,
+                schema: z.object({ message: z.string() }).passthrough(),
+            },
+        ],
+    },
+    {
         method: 'post',
         path: '/v1/users/:user/reset-pending-email',
         alias: 'resetUserPendingEmail',

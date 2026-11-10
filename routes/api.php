@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\V1\Public\ReportController as PublicReportControlle
 use App\Http\Controllers\Api\V1\ReportController;
 use App\Http\Controllers\Api\V1\TagController;
 use App\Http\Controllers\Api\V1\TaskController;
+use App\Http\Controllers\Api\V1\TaskPlaneController;
 use App\Http\Controllers\Api\V1\TimeEntryController;
 use App\Http\Controllers\Api\V1\TimeEntryPlaneController;
 use App\Http\Controllers\Api\V1\TimeZoneController;
@@ -171,6 +172,7 @@ Route::prefix('v1')->name('v1.')->group(static function (): void {
             Route::post('/tasks', [TaskController::class, 'store'])->name('store')->middleware('check-organization-blocked');
             Route::put('/tasks/{task}', [TaskController::class, 'update'])->name('update')->middleware('check-organization-blocked');
             Route::delete('/tasks/{task}', [TaskController::class, 'destroy'])->name('destroy');
+            Route::get('/tasks/{task}/plane', [TaskPlaneController::class, 'show'])->name('plane');
         });
 
         // Import routes
