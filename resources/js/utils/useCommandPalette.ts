@@ -164,7 +164,7 @@ export function useCommandPalette() {
 
     async function stopTimer() {
         closePaletteAfterAction();
-        await setActiveState(false);
+        await setActiveState(false, { offerPlaneReview: true });
     }
 
     function openCreateTimeEntryModal() {

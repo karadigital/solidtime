@@ -224,7 +224,11 @@ export const useCurrentTimeEntryStore = defineStore('currentTimeEntry', () => {
         return false;
     });
 
-    async function setActiveState(newState: boolean) {
+    /**
+     * @param options.offerPlaneReview Only for the user's explicit Stop action: offers to move the task's Plane work
+     *                                 item to review. Stops that only precede starting another timer don't offer it.
+     */
+    async function setActiveState(newState: boolean, options: { offerPlaneReview?: boolean } = {}) {
         if (newState) {
             startLiveTimer();
             await startTimer();
@@ -233,7 +237,12 @@ export const useCurrentTimeEntryStore = defineStore('currentTimeEntry', () => {
             const stoppedTimeEntryId = currentTimeEntry.value.id;
             const stoppedTaskId = currentTimeEntry.value.task_id;
             const stopped = await stopTimer();
-            if (stopped && stoppedTaskId !== null && isPlaneIntegrationEnabled()) {
+            if (
+                options.offerPlaneReview === true &&
+                stopped &&
+                stoppedTaskId !== null &&
+                isPlaneIntegrationEnabled()
+            ) {
                 planeReviewCandidate.value = {
                     timeEntryId: stoppedTimeEntryId,
                     taskId: stoppedTaskId,

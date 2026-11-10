@@ -66,9 +66,21 @@ describe('useCurrentTimeEntryStore Plane review prompt', () => {
         const store = useCurrentTimeEntryStore();
         store.currentTimeEntry = { ...runningEntry };
 
-        await store.setActiveState(false);
+        await store.setActiveState(false, { offerPlaneReview: true });
 
         expect(store.planeReviewCandidate).toEqual({ timeEntryId: 'te-1', taskId: 't1' });
+    });
+
+    it('does not offer a review when the timer is stopped to start another one', async () => {
+        api.updateTimeEntry.mockResolvedValue({
+            data: { ...runningEntry, end: '2026-11-10T03:00:00Z' },
+        });
+        const store = useCurrentTimeEntryStore();
+        store.currentTimeEntry = { ...runningEntry };
+
+        await store.setActiveState(false);
+
+        expect(store.planeReviewCandidate).toBeNull();
     });
 
     it('does not offer a review when the stop failed', async () => {
@@ -76,7 +88,7 @@ describe('useCurrentTimeEntryStore Plane review prompt', () => {
         const store = useCurrentTimeEntryStore();
         store.currentTimeEntry = { ...runningEntry };
 
-        await store.setActiveState(false);
+        await store.setActiveState(false, { offerPlaneReview: true });
 
         expect(store.planeReviewCandidate).toBeNull();
     });
@@ -89,7 +101,7 @@ describe('useCurrentTimeEntryStore Plane review prompt', () => {
         const store = useCurrentTimeEntryStore();
         store.currentTimeEntry = { ...runningEntry };
 
-        await store.setActiveState(false);
+        await store.setActiveState(false, { offerPlaneReview: true });
 
         expect(store.planeReviewCandidate).toBeNull();
     });
@@ -101,7 +113,7 @@ describe('useCurrentTimeEntryStore Plane review prompt', () => {
         const store = useCurrentTimeEntryStore();
         store.currentTimeEntry = { ...runningEntry, task_id: null };
 
-        await store.setActiveState(false);
+        await store.setActiveState(false, { offerPlaneReview: true });
 
         expect(store.planeReviewCandidate).toBeNull();
     });

@@ -190,7 +190,7 @@ const { tags } = useTagsQuery();
                         @start-live-timer="startLiveTimer"
                         @stop-live-timer="stopLiveTimer"
                         @start-timer="setActiveState(true)"
-                        @stop-timer="setActiveState(false)"
+                        @stop-timer="setActiveState(false, { offerPlaneReview: true })"
                         @update-time-entry="updateTimeEntry"
                         @create-time-entry="createTimeEntryFromCurrentEntry"></TimeTrackerControls>
                 </div>
