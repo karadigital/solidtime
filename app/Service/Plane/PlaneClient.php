@@ -54,6 +54,40 @@ class PlaneClient
     }
 
     /**
+     * Work item with expanded state, assignees and labels, as returned by Plane.
+     *
+     * @return array<string, mixed>|null null if the work item does not exist or is not accessible (see findWorkItem)
+     *
+     * @throws PlaneApiException
+     */
+    public function getWorkItem(string $identifier): ?array
+    {
+        $response = $this->send(fn (PendingRequest $request): Response => $request->get(
+            $this->workspaceUrl('/work-items/'.$identifier.'/'),
+            ['expand' => 'state,assignees,labels']
+        ));
+        if ($response->status() === 404 || $response->status() === 403) {
+            return null;
+        }
+        $this->ensureSuccessful($response);
+
+        /** @var array<string, mixed> $workItem */
+        $workItem = $response->json() ?? [];
+
+        return $workItem;
+    }
+
+    /**
+     * Link to the work item in the Plane web app.
+     */
+    public function workItemUrl(string $identifier): string
+    {
+        $appUrl = rtrim(trim((string) config('services.plane.app_url')), '/');
+
+        return ($appUrl !== '' ? $appUrl : $this->baseUrl()).'/'.$this->workspaceSlug().'/browse/'.$identifier.'/';
+    }
+
+    /**
      * @return list<array{id: string, name: string, group: string}>
      *
      * @throws PlaneApiException
