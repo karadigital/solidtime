@@ -73,7 +73,8 @@ class ProjectModelTest extends ModelTestAbstract
         // Assert
         $this->assertNotNull($tasksRel);
         $this->assertCount(3, $tasksRel);
-        $this->assertTrue($tasksRel->first()->is($tasks->first()));
+        // The relation has no order, so compare the ids regardless of their order
+        $this->assertEqualsCanonicalizing($tasks->pluck('id')->all(), $tasksRel->pluck('id')->all());
     }
 
     public function test_it_has_many_members(): void
@@ -89,7 +90,8 @@ class ProjectModelTest extends ModelTestAbstract
         // Assert
         $this->assertNotNull($membersRel);
         $this->assertCount(3, $membersRel);
-        $this->assertTrue($membersRel->first()->is($members->first()));
+        // The relation has no order, so compare the ids regardless of their order
+        $this->assertEqualsCanonicalizing($members->pluck('id')->all(), $membersRel->pluck('id')->all());
     }
 
     public function test_scope_visible_by_user_filters_so_that_only_public_projects_or_projects_where_the_user_is_member_are_shown(): void
