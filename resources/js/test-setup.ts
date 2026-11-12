@@ -3,7 +3,8 @@
 // `getIntervalFormat`) so that helpers under test don't crash when imported
 // outside the running app.
 
-import { vi } from 'vitest';
+import { beforeEach, vi } from 'vitest';
+import { Storage } from 'happy-dom';
 
 declare global {
     interface Window {
@@ -27,4 +28,19 @@ Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true
 Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
     configurable: true,
     get: () => 350,
+});
+
+// Node 22+ defines its own global localStorage, which is undefined without --localstorage-file and hides
+// happy-dom's. Stores would then silently not persist anything, so tests would behave differently per Node version.
+if (!globalThis.localStorage) {
+    Object.defineProperty(globalThis, 'localStorage', {
+        configurable: true,
+        value: new Storage(),
+    });
+}
+
+// Stores persist state via useLocalStorage (e.g. the running timer). localStorage lives for the whole test file,
+// so without this a test would start with the state the previous test left behind.
+beforeEach(() => {
+    localStorage.clear();
 });
