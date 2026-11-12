@@ -9,8 +9,9 @@ async function createProjectWithMemberViaApi(ctx: TestContext, page: Page, proje
     const project = await createProjectViaApi(ctx, { name: projectName });
     await createProjectMemberViaApi(ctx, project.id, { member_id: ctx.memberId });
 
-    // Navigate to the project detail page
+    // Navigate to the project detail page and open the project members modal (KARA-48)
     await page.goto(PLAYWRIGHT_BASE_URL + '/projects/' + project.id);
+    await page.getByRole('button', { name: 'Show Member' }).click();
     await expect(page.getByTestId('project_member_table').getByRole('row').first()).toBeVisible();
     return project;
 }
