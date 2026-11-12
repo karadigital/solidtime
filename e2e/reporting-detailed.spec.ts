@@ -747,22 +747,30 @@ test.describe('Reporting Detailed Pagination', () => {
         );
 
         await goToReportingDetailed(page);
-        await expect(page.getByText(descriptions[0]!).first()).toBeVisible({
+        // All entries share the same start, so their order (and which ones land on page 2) is random:
+        // wait for any of them instead of a specific one.
+        await expect(
+            page.getByText(new RegExp(`^ReportPagEntry \\d{2} ${seed}$`)).first()
+        ).toBeVisible({
             timeout: 10000,
         });
 
         // Pagination nav should be rendered.
         await expect(page.getByRole('button', { name: 'Next Page' })).toBeVisible();
 
-        // Collect which descriptions are currently visible on page 1.
-        const visiblePage1 = new Set<string>();
-        for (const description of descriptions) {
-            if ((await page.getByText(description).count()) > 0) {
-                visiblePage1.add(description);
+        async function visibleDescriptions(): Promise<Set<string>> {
+            const visible = new Set<string>();
+            for (const description of descriptions) {
+                if ((await page.getByText(description).count()) > 0) {
+                    visible.add(description);
+                }
             }
+            return visible;
         }
+
         // The page limit is 15 → exactly 15 entries visible on page 1.
-        expect(visiblePage1.size).toBe(15);
+        await expect.poll(async () => (await visibleDescriptions()).size).toBe(15);
+        const visiblePage1 = await visibleDescriptions();
 
         // Go to page 2 and wait for the server fetch.
         await Promise.all([
@@ -770,19 +778,15 @@ test.describe('Reporting Detailed Pagination', () => {
             waitForDetailedReportingUpdate(page),
         ]);
 
-        const visiblePage2 = new Set<string>();
-        for (const description of descriptions) {
-            if ((await page.getByText(description).count()) > 0) {
-                visiblePage2.add(description);
-            }
-        }
+        // The response can arrive before the table re-renders: wait until no page 1 entry is shown anymore.
+        await expect
+            .poll(async () => [...(await visibleDescriptions())].filter((d) => visiblePage1.has(d)))
+            .toEqual([]);
         // Page 2 should hold the remaining 2 entries, disjoint from page 1.
-        expect(visiblePage2.size).toBe(2);
-        for (const description of visiblePage2) {
-            expect(visiblePage1.has(description)).toBe(false);
-        }
+        await expect.poll(async () => (await visibleDescriptions()).size).toBe(2);
+        const visiblePage2 = await visibleDescriptions();
         // Across both pages, all 17 entries should have been visible.
-        expect(visiblePage1.size + visiblePage2.size).toBe(17);
+        expect(new Set([...visiblePage1, ...visiblePage2]).size).toBe(17);
 
         // Page 2 button is selected.
         await expect(page.getByRole('button', { name: 'Page 2' })).toHaveAttribute(
@@ -795,7 +799,8 @@ test.describe('Reporting Detailed Pagination', () => {
             page.getByRole('button', { name: 'Previous Page' }).click(),
             waitForDetailedReportingUpdate(page),
         ]);
-        expect((await page.getByText(descriptions[0]!).count()) > 0).toBe(true);
+        await expect.poll(async () => (await visibleDescriptions()).size).toBe(15);
+        await expect(page.getByText([...visiblePage1][0]!).first()).toBeVisible();
     });
 
     test('test that reporting pagination is not shown when there are 15 or fewer time entries', async ({
