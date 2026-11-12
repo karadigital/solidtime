@@ -32,7 +32,10 @@ const { data: latestTeamActivity, isLoading } = useQuery({
         <div v-if="isLoading" class="flex justify-center items-center h-40">
             <LoadingSpinner />
         </div>
-        <div v-else-if="latestTeamActivity">
+        <div
+            v-else-if="latestTeamActivity"
+            data-testid="team_activity_list"
+            class="max-h-72 overflow-y-auto">
             <TeamActivityCardEntry
                 v-for="activity in latestTeamActivity"
                 :key="activity.time_entry_id"

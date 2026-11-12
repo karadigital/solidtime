@@ -42,6 +42,8 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
  * @property string $timezone
  * @property bool $is_placeholder
  * @property Weekday $week_start
+ * @property bool $auto_stop_time_entries
+ * @property string $auto_stop_time Time of day (H:i, in the user's timezone) at which running time entries are stopped automatically
  * @property string|null $profile_photo_path
  * @property-read Organization|null $currentOrganization
  * @property-read string $profile_photo_url
@@ -108,6 +110,7 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, M
         'is_admin' => 'boolean',
         'is_placeholder' => 'boolean',
         'week_start' => Weekday::class,
+        'auto_stop_time_entries' => 'boolean',
     ];
 
     /**
@@ -117,6 +120,8 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, M
      */
     protected $attributes = [
         'week_start' => Weekday::Monday,
+        'auto_stop_time_entries' => false,
+        'auto_stop_time' => '17:30',
     ];
 
     /**

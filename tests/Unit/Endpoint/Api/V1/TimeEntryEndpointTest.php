@@ -2147,7 +2147,7 @@ class TimeEntryEndpointTest extends ApiEndpointTestAbstract
         $response->assertForbidden();
     }
 
-    public function test_store_endpoint_fails_if_user_already_has_active_time_entry_and_tries_to_start_new_one(): void
+    public function test_store_endpoint_starts_a_second_running_time_entry(): void
     {
         // Arrange
         $data = $this->createUserWithPermission([
@@ -2171,8 +2171,39 @@ class TimeEntryEndpointTest extends ApiEndpointTestAbstract
         ]);
 
         // Assert
+        $response->assertStatus(201);
+        $response->assertJsonPath('data.end', null);
+        $this->assertSame(2, TimeEntry::query()->whereNull('end')->where('member_id', $data->member->getKey())->count());
+    }
+
+    public function test_store_rejects_second_running_entry_when_organization_prevents_overlapping(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission([
+            'time-entries:create:own',
+            'projects:view:all',
+        ]);
+        $activeTimeEntry = TimeEntry::factory()->forOrganization($data->organization)->forMember($data->member)->active()->create();
+        $timeEntryFake = TimeEntry::factory()->forOrganization($data->organization)->withTask($data->organization)->withTags($data->organization)->make();
+        $data->organization->update(['prevent_overlapping_time_entries' => true]);
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->postJson(route('api.v1.time-entries.store', [$data->organization->getKey()]), [
+            'description' => $timeEntryFake->description,
+            'billable' => $timeEntryFake->billable,
+            'start' => $timeEntryFake->start->toIso8601ZuluString(),
+            'end' => null,
+            'tags' => $timeEntryFake->tags,
+            'member_id' => $data->member->getKey(),
+            'project_id' => $timeEntryFake->project_id,
+            'task_id' => $timeEntryFake->task_id,
+        ]);
+
+        // Assert
         $response->assertStatus(400);
         $response->assertJsonPath('error', true);
+        $response->assertJsonPath('key', 'time_entry_still_running');
     }
 
     public function test_store_endpoint_validation_fails_if_task_id_does_not_belong_to_project_id(): void

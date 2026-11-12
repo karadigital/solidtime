@@ -12,6 +12,7 @@ import {
 import { useLocalStorage } from '@vueuse/core';
 import { useNotificationsStore } from '@/utils/notification';
 import { useQueryClient } from '@tanstack/vue-query';
+import { isPlaneIntegrationEnabled } from '@/utils/plane';
 
 dayjs.extend(utc);
 
@@ -31,12 +32,36 @@ const emptyTimeEntry = {
 
 export const useCurrentTimeEntryStore = defineStore('currentTimeEntry', () => {
     const currentTimeEntry = ref<TimeEntry>({ ...emptyTimeEntry });
-    const { handleApiRequestNotifications } = useNotificationsStore();
+    const { handleApiRequestNotifications, addNotification } = useNotificationsStore();
     const queryClient = useQueryClient();
 
     useLocalStorage('solidtime/current-time-entry', currentTimeEntry, {
         deep: true,
     });
+
+    /**
+     * Set after the user stopped a timer on a task, so the user can be asked whether to move
+     * the task's Plane work item to review (see PlaneReviewPrompt).
+     */
+    const planeReviewCandidate = ref<{ timeEntryId: string; taskId: string } | null>(null);
+
+    /**
+     * Running timers other than the main one shown in the time tracker, newest first (KARA-98).
+     */
+    const backgroundTimeEntries = ref<TimeEntry[]>([]);
+
+    /**
+     * True after "New timer" until a timer is started or focused: the tracker holds a draft that a fetch must keep.
+     */
+    const composingNewTimer = ref(false);
+    // Persisted next to the draft, so other tabs and reloads keep treating it as a new timer
+    useLocalStorage('solidtime/composing-new-timer', composingNewTimer);
+
+    /**
+     * Guards against starting the same timer twice (double click / double Enter): the server allows parallel
+     * running timers, so it no longer rejects the second request.
+     */
+    const isStarting = ref(false);
 
     function $reset() {
         currentTimeEntry.value = { ...emptyTimeEntry };
@@ -61,41 +86,43 @@ export const useCurrentTimeEntryStore = defineStore('currentTimeEntry', () => {
 
     async function fetchCurrentTimeEntry() {
         const organizationId = getCurrentOrganizationId();
-        if (organizationId) {
-            try {
-                const timeEntriesResponse = await api.getMyActiveTimeEntry({});
-                if (timeEntriesResponse?.data) {
-                    if (timeEntriesResponse.data) {
-                        currentTimeEntry.value = timeEntriesResponse.data;
-                        if (
-                            currentTimeEntry.value.start !== '' &&
-                            currentTimeEntry.value.end === null
-                        ) {
-                            startLiveTimer();
-                        }
-                    } else {
-                        // No active time entry on server
-                        // Only reset if we had a previously started timer (has an ID)
-                        // Don't reset if user is preparing a new time entry (no ID yet)
-                        if (currentTimeEntry.value.id !== '') {
-                            currentTimeEntry.value = { ...emptyTimeEntry };
-                            stopLiveTimer();
-                        }
-                    }
-                }
-            } catch {
-                // API error (e.g., 404 when no active time entry)
-                // Only reset if we had a previously started timer (has an ID)
-                // Don't reset if user is preparing a new time entry (no ID yet)
-                if (currentTimeEntry.value.id !== '') {
-                    currentTimeEntry.value = { ...emptyTimeEntry };
-                    stopLiveTimer();
-                }
-            }
-        } else {
+        if (!organizationId) {
             throw new Error(
                 'Failed to fetch current time entry because organization ID is missing.'
             );
+        }
+        let running: TimeEntry[];
+        try {
+            const response = await api.getMyRunningTimeEntries({});
+            running = response?.data ?? [];
+        } catch {
+            return;
+        }
+
+        if (composingNewTimer.value && currentTimeEntry.value.id !== '') {
+            // The tracker holds a running timer again (f.e. written by another tab): no longer composing
+            composingNewTimer.value = false;
+        }
+        if (composingNewTimer.value) {
+            backgroundTimeEntries.value = running;
+        } else {
+            const main =
+                running.find((timeEntry) => timeEntry.id === currentTimeEntry.value.id) ??
+                running[0] ??
+                null;
+            if (main !== null) {
+                currentTimeEntry.value = main;
+            } else if (currentTimeEntry.value.id !== '') {
+                // The timer was stopped elsewhere. A draft without id (not started yet) is kept.
+                $reset();
+            }
+            backgroundTimeEntries.value = running.filter((timeEntry) => timeEntry.id !== main?.id);
+        }
+
+        if (running.length > 0) {
+            startLiveTimer();
+        } else {
+            stopLiveTimer();
         }
     }
 
@@ -124,7 +151,13 @@ export const useCurrentTimeEntryStore = defineStore('currentTimeEntry', () => {
                 'Timer started!'
             );
             if (response?.data) {
+                const startedId = response.data.id;
                 currentTimeEntry.value = response.data;
+                composingNewTimer.value = false;
+                // A fetch during the request may already have listed the new timer
+                backgroundTimeEntries.value = backgroundTimeEntries.value.filter(
+                    (timeEntry) => timeEntry.id !== startedId
+                );
             }
         } else {
             throw new Error(
@@ -133,12 +166,54 @@ export const useCurrentTimeEntryStore = defineStore('currentTimeEntry', () => {
         }
     }
 
-    async function stopTimer() {
+    /**
+     * The timer may have been stopped on the server in the meantime (e.g. by the auto stop at the end of the
+     * workday, or on another device). Writing to it then would overwrite its end, so check first.
+     * Returns false (and resets the local timer) if the current time entry is no longer running on the server.
+     */
+    async function isStillRunning(timeEntryId: string): Promise<boolean> {
+        try {
+            const response = await api.getMyRunningTimeEntries({});
+            return (response?.data ?? []).some((timeEntry) => timeEntry.id === timeEntryId);
+        } catch {
+            // Keep the previous behaviour if the check itself fails
+            return true;
+        }
+    }
+
+    function notifyAlreadyStopped() {
+        addNotification(
+            'error',
+            'Your timer was already stopped',
+            'It was stopped automatically or on another device. Your change was not saved.'
+        );
+        queryClient.invalidateQueries({ queryKey: ['timeEntries'] });
+    }
+
+    async function ensureCurrentTimeEntryIsStillRunning(): Promise<boolean> {
+        const stillRunning = await isStillRunning(currentTimeEntry.value.id);
+        if (!stillRunning) {
+            $reset();
+            if (backgroundTimeEntries.value.length === 0) {
+                stopLiveTimer();
+            }
+            notifyAlreadyStopped();
+        }
+        return stillRunning;
+    }
+
+    /**
+     * @returns true if the timer was stopped on the server
+     */
+    async function stopTimer(): Promise<boolean> {
         const user = getCurrentUserId();
         const organization = getCurrentOrganizationId();
         if (organization) {
+            if (!(await ensureCurrentTimeEntryIsStillRunning())) {
+                return false;
+            }
             const currentDateTime = dayjs().utc().format();
-            await handleApiRequestNotifications(
+            const response = await handleApiRequestNotifications(
                 () =>
                     api.updateTimeEntry(
                         {
@@ -156,6 +231,7 @@ export const useCurrentTimeEntryStore = defineStore('currentTimeEntry', () => {
                 'Timer stopped!'
             );
             $reset();
+            return response?.data !== undefined;
         } else {
             throw new Error('Failed to stop current timer because organization ID is missing.');
         }
@@ -165,6 +241,12 @@ export const useCurrentTimeEntryStore = defineStore('currentTimeEntry', () => {
         const user = getCurrentUserId();
         const organization = getCurrentOrganizationId();
         if (organization) {
+            if (
+                currentTimeEntry.value.end === null &&
+                !(await ensureCurrentTimeEntryIsStillRunning())
+            ) {
+                return;
+            }
             const response = await handleApiRequestNotifications(
                 () =>
                     api.updateTimeEntry(
@@ -192,7 +274,9 @@ export const useCurrentTimeEntryStore = defineStore('currentTimeEntry', () => {
                     currentTimeEntry.value = response.data;
                 } else {
                     $reset();
-                    stopLiveTimer();
+                    if (backgroundTimeEntries.value.length === 0) {
+                        stopLiveTimer();
+                    }
                 }
             }
         } else {
@@ -213,15 +297,144 @@ export const useCurrentTimeEntryStore = defineStore('currentTimeEntry', () => {
         return false;
     });
 
-    async function setActiveState(newState: boolean) {
+    const hasRunningTimers = computed(
+        () => isActive.value || backgroundTimeEntries.value.length > 0
+    );
+
+    function offerPlaneReviewFor(timeEntryId: string, taskId: string | null) {
+        if (taskId !== null && isPlaneIntegrationEnabled()) {
+            planeReviewCandidate.value = { timeEntryId, taskId };
+        }
+    }
+
+    /**
+     * @param options.offerPlaneReview Only for the user's explicit Stop action: offers to move the task's Plane work
+     *                                 item to review. Stops that only precede starting another timer don't offer it.
+     * @param options.promoteNextTimer After stopping, show the newest background timer in the tracker (default).
+     *                                 Quick-start actions that replace the main timer pass false.
+     */
+    async function setActiveState(
+        newState: boolean,
+        options: { offerPlaneReview?: boolean; promoteNextTimer?: boolean } = {}
+    ) {
         if (newState) {
-            startLiveTimer();
-            await startTimer();
+            if (isStarting.value) {
+                return;
+            }
+            isStarting.value = true;
+            try {
+                startLiveTimer();
+                await startTimer();
+            } finally {
+                isStarting.value = false;
+            }
         } else {
-            stopLiveTimer();
-            await stopTimer();
+            const stoppedTimeEntryId = currentTimeEntry.value.id;
+            const stoppedTaskId = currentTimeEntry.value.task_id;
+            const stopped = await stopTimer();
+            if (options.offerPlaneReview === true && stopped) {
+                offerPlaneReviewFor(stoppedTimeEntryId, stoppedTaskId);
+            }
+            const next = backgroundTimeEntries.value[0];
+            if (options.promoteNextTimer !== false && currentTimeEntry.value.id === '' && next) {
+                currentTimeEntry.value = next;
+                backgroundTimeEntries.value = backgroundTimeEntries.value.slice(1);
+            }
+            if (!hasRunningTimers.value) {
+                stopLiveTimer();
+            }
         }
         queryClient.invalidateQueries({ queryKey: ['timeEntries'] });
+    }
+
+    /**
+     * For quick-start actions (play on an entry, recently tracked, ...) that replace the main timer: stops the main
+     * timer if one runs, without touching background timers, and ends composing so the next fetch shows the started
+     * timer in the tracker.
+     */
+    async function prepareQuickStart() {
+        if (currentTimeEntry.value.id !== '') {
+            await setActiveState(false, { promoteNextTimer: false });
+        }
+        composingNewTimer.value = false;
+    }
+
+    /**
+     * Keeps the main timer running in the background and opens an empty tracker for a new timer.
+     */
+    function startAnotherTimer() {
+        if (isActive.value) {
+            backgroundTimeEntries.value = [currentTimeEntry.value, ...backgroundTimeEntries.value];
+        }
+        $reset();
+        composingNewTimer.value = true;
+    }
+
+    /**
+     * Shows a background timer in the tracker. The previous main timer keeps running in the background; an
+     * unsaved draft is discarded.
+     */
+    function focusTimer(timeEntryId: string) {
+        const timeEntry = backgroundTimeEntries.value.find((entry) => entry.id === timeEntryId);
+        if (!timeEntry) {
+            return;
+        }
+        const others = backgroundTimeEntries.value.filter((entry) => entry.id !== timeEntryId);
+        backgroundTimeEntries.value = isActive.value ? [currentTimeEntry.value, ...others] : others;
+        currentTimeEntry.value = timeEntry;
+        composingNewTimer.value = false;
+    }
+
+    /**
+     * @returns true if the timer was stopped on the server
+     */
+    async function stopBackgroundTimer(
+        timeEntryId: string,
+        options: { offerPlaneReview?: boolean } = {}
+    ): Promise<boolean> {
+        const timeEntry = backgroundTimeEntries.value.find((entry) => entry.id === timeEntryId);
+        if (!timeEntry) {
+            return false;
+        }
+        const removeFromBackground = () => {
+            backgroundTimeEntries.value = backgroundTimeEntries.value.filter(
+                (entry) => entry.id !== timeEntryId
+            );
+            if (!hasRunningTimers.value) {
+                stopLiveTimer();
+            }
+        };
+        if (!(await isStillRunning(timeEntryId))) {
+            removeFromBackground();
+            notifyAlreadyStopped();
+            return false;
+        }
+        const response = await handleApiRequestNotifications(
+            () =>
+                api.updateTimeEntry(
+                    {
+                        user_id: getCurrentUserId(),
+                        start: timeEntry.start,
+                        end: dayjs().utc().format(),
+                    },
+                    {
+                        params: {
+                            organization: timeEntry.organization_id,
+                            timeEntry: timeEntryId,
+                        },
+                    }
+                ),
+            'Timer stopped!'
+        );
+        const stopped = response?.data !== undefined;
+        if (stopped) {
+            removeFromBackground();
+            if (options.offerPlaneReview === true) {
+                offerPlaneReviewFor(timeEntryId, timeEntry.task_id);
+            }
+        }
+        queryClient.invalidateQueries({ queryKey: ['timeEntries'] });
+        return stopped;
     }
 
     return {
@@ -233,6 +446,14 @@ export const useCurrentTimeEntryStore = defineStore('currentTimeEntry', () => {
         stopLiveTimer,
         now,
         setActiveState,
+        planeReviewCandidate,
+        backgroundTimeEntries,
+        composingNewTimer,
+        hasRunningTimers,
+        startAnotherTimer,
+        prepareQuickStart,
+        focusTimer,
+        stopBackgroundTimer,
         $reset,
     };
 });

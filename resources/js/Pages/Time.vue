@@ -3,7 +3,6 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import TimeTracker from '@/Components/TimeTracker.vue';
 import { computed, ref, watch } from 'vue';
 import MainContainer from '@/packages/ui/src/MainContainer.vue';
-import { storeToRefs } from 'pinia';
 import type {
     CreateClientBody,
     CreateProjectBody,
@@ -53,13 +52,10 @@ async function updateTimeEntries(ids: string[], changes: UpdateMultipleTimeEntri
 const loadMoreContainer = ref<HTMLDivElement | null>(null);
 const isLoadMoreVisible = useElementVisibility(loadMoreContainer);
 const currentTimeEntryStore = useCurrentTimeEntryStore();
-const { currentTimeEntry } = storeToRefs(currentTimeEntryStore);
-const { setActiveState } = currentTimeEntryStore;
 
 async function startTimeEntry(timeEntry: Omit<CreateTimeEntryBody, 'member_id'>) {
-    if (currentTimeEntry.value.id) {
-        await setActiveState(false);
-    }
+    // Replace the main timer; other running timers keep running (KARA-98)
+    await currentTimeEntryStore.prepareQuickStart();
     await createTimeEntryMutation(timeEntry);
     useCurrentTimeEntryStore().fetchCurrentTimeEntry();
 }

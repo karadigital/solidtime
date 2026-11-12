@@ -124,6 +124,14 @@ class UserController extends Controller
             $user->week_start = $request->getWeekStart();
         }
 
+        if ($request->getAutoStopTimeEntries() !== null) {
+            $user->auto_stop_time_entries = $request->getAutoStopTimeEntries();
+        }
+
+        if ($request->getAutoStopTime() !== null) {
+            $user->auto_stop_time = $request->getAutoStopTime();
+        }
+
         $user->save();
 
         if ($emailToVerify !== null) {

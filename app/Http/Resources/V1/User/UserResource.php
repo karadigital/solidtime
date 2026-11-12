@@ -36,6 +36,10 @@ class UserResource extends BaseResource
             'timezone' => $this->resource->timezone,
             /** @var Weekday $week_start Starting day of the week */
             'week_start' => $this->resource->week_start->value,
+            /** @var bool $auto_stop_time_entries Whether running time entries are stopped automatically at auto_stop_time (Monday to Friday) */
+            'auto_stop_time_entries' => $this->resource->auto_stop_time_entries,
+            /** @var string $auto_stop_time Time of day in the user's timezone at which running time entries are stopped automatically (Format: "H:i", Example: "17:30") */
+            'auto_stop_time' => $this->resource->auto_stop_time,
         ];
     }
 }

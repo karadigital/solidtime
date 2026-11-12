@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { ClockIcon } from '@heroicons/vue/20/solid';
+import { ClockIcon, PlusIcon } from '@heroicons/vue/20/solid';
+import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
+import RunningTimersList from '@/Components/RunningTimersList.vue';
 import CardTitle from '@/packages/ui/src/CardTitle.vue';
 import { usePage } from '@inertiajs/vue3';
 import { type User } from '@/types/models';
@@ -51,7 +53,7 @@ dayjs.extend(utc);
 const { organization } = useOrganizationQuery(getCurrentOrganizationId()!);
 
 const currentTimeEntryStore = useCurrentTimeEntryStore();
-const { currentTimeEntry, isActive, now } = storeToRefs(currentTimeEntryStore);
+const { currentTimeEntry, isActive, now, hasRunningTimers } = storeToRefs(currentTimeEntryStore);
 const { startLiveTimer, stopLiveTimer, setActiveState } = currentTimeEntryStore;
 
 const { projects } = useProjectsQuery();
@@ -68,13 +70,24 @@ const { createTimeEntry: createTimeEntryMutation, deleteTimeEntry } = useTimeEnt
 const { data: timeEntriesData } = useTimeEntriesInfiniteQuery();
 const timeEntries = computed(() => timeEntriesData.value?.pages.flatMap((page) => page.data) || []);
 
+const canStartAnotherTimer = computed(
+    () => isActive.value && organization.value?.prevent_overlapping_time_entries !== true
+);
+
+function startAnotherTimer() {
+    currentTimeEntryStore.startAnotherTimer();
+}
+
 watch(isActive, () => {
-    if (isActive.value) {
+    emit('change');
+});
+
+watch(hasRunningTimers, () => {
+    if (hasRunningTimers.value) {
         startLiveTimer();
     } else {
         stopLiveTimer();
     }
-    emit('change');
 });
 
 onMounted(async () => {
@@ -190,15 +203,23 @@ const { tags } = useTagsQuery();
                         @start-live-timer="startLiveTimer"
                         @stop-live-timer="stopLiveTimer"
                         @start-timer="setActiveState(true)"
-                        @stop-timer="setActiveState(false)"
+                        @stop-timer="setActiveState(false, { offerPlaneReview: true })"
                         @update-time-entry="updateTimeEntry"
                         @create-time-entry="createTimeEntryFromCurrentEntry"></TimeTrackerControls>
                 </div>
+                <SecondaryButton
+                    v-if="canStartAnotherTimer"
+                    :icon="PlusIcon"
+                    class="shrink-0"
+                    @click="startAnotherTimer">
+                    New timer
+                </SecondaryButton>
                 <TimeTrackerMoreOptionsDropdown
                     :has-active-timer="isActive"
                     @manual-entry="showManualTimeEntryModal = true"
                     @discard="discardCurrentTimeEntry"></TimeTrackerMoreOptionsDropdown>
             </div>
         </div>
+        <RunningTimersList></RunningTimersList>
     </div>
 </template>

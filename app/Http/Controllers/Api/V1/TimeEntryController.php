@@ -590,7 +590,11 @@ class TimeEntryController extends Controller
             $this->checkPermission($organization, 'time-entries:create:all');
         }
 
-        if ($request->input('end') === null && TimeEntry::query()->whereBelongsTo($member, 'member')->where('end', null)->exists()) {
+        // Parallel running timers are allowed (KARA-98), unless the organization prevents overlapping time entries:
+        // stopping parallel timers would then fail with an overlap error.
+        if ($organization->prevent_overlapping_time_entries
+            && $request->input('end') === null
+            && TimeEntry::query()->whereBelongsTo($member, 'member')->where('end', null)->exists()) {
             throw new TimeEntryStillRunningApiException;
         }
 
